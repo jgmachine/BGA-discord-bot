@@ -17,7 +17,7 @@ async def handleCommand(message):
     command = message.content.lower()
 
     if command.startswith("!hello"):
-        await command.channel.send("hello!")
+        await message.channel.send("hello!")
 
     if command.startswith("!remove_me"):
         database.deleteUserData(message.author.id)
