@@ -1,0 +1,105 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    kubernetes.io/metadata.name: bga-discord-bot
+  name: bga-discord-bot
+spec:
+  finalizers:
+  - kubernetes
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: bga-discord-bot
+  name: bga-discord-bot
+  namespace: bga-discord-bot
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: bga-discord-bot
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: bga-discord-bot
+    spec:
+      containers:
+      - image: docker.io/johrad/bga-discord-bot
+        imagePullPolicy: Always
+        name: bga-discord-bot
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        env:
+        - name: DISCORD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: bga-env-var-secrets
+              key: discord_token
+        - name: NOTIFY_CHANNEL_ID
+          valueFrom:
+            secretKeyRef:
+              name: bga-env-var-secrets
+              key: notify_channel_id
+        volumeMounts:
+        - mountPath: /app/database.db
+          subPath: database.db
+          name: bga-discord-bot-storage
+      volumes:
+      - name: bga-discord-bot-storage
+        persistentVolumeClaim:
+          claimName: bga-discord-bot-pvc
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bga-env-var-secrets
+  namespace: bga-discord-bot
+type: Opaque
+data:
+  discord_token: <base64 encoded token>
+  notify_channel_id: <base64 encoded channelid>
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: bga-discord-bot-pv
+  namespace: bga-discord-bot
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/path
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: bga-discord-botfs
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bga-discord-bot-pvc
+  namespace: bga-discord-bot
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: bga-discord-botfs
