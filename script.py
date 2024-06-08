@@ -7,36 +7,35 @@ import discord
 from discord.ext import commands
 from src.database import Database
 from src import taskService
-import botReference
 
 load_dotenv()
 loggingConfig.setupLogging()
 TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True
-botReference.bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 database = Database("database.db")
 
 
-@botReference.bot.event
+@bot.event
 async def on_ready():
-    logging.info(f"We have logged in as {botReference.bot.user}")
+    logging.info(f"We have logged in as {bot.user}")
     database.createTables()
-    taskService.processGames.start()
+    taskService.processGames.start(bot)
 
 
-@botReference.bot.event
+@bot.event
 async def on_message(message):
     if message.author.bot:
         return
     else:
-        await messageController.handleCommand(message)
+        await messageController.handleCommand(bot, message)
 
 
 if __name__ == "__main__":
     try:
-        botReference.bot.run(TOKEN)
+        bot.run(TOKEN)
     finally:
         logging.info("Closing down.")
         database.close()

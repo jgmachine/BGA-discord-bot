@@ -15,7 +15,7 @@ database = Database("database.db")
 # If the fetched player id is the same as last time, do nothing
 #
 # If the fetched player id is new, update game entity with new active player id and notify discord user
-async def processGame(game):
+async def processGame(bot, game):
     logging.info(f"Fetching active player for game: {game.name} with id: {game.id}")
     activePlayerId = await webscraper.fetchActivePlayer(game.url)
     previousActivePlayerId = database.getActivePlayer(game.id)
@@ -36,14 +36,14 @@ async def processGame(game):
             f"New active player in game: {game.id} New player: {activePlayerId} Previous active player: {previousActivePlayerId}"
         )
         database.updateActivePlayer(game.id, activePlayerId)
-        await messageController.notifyer(activePlayerId, game.id)
+        await messageController.notifyer(bot, activePlayerId, game.id)
 
 
 # Task for fetching active player ids and update database if active player changed
 @tasks.loop(minutes=1)
-async def processGames():
+async def processGames(bot):
     games = database.getAllGames()
     logging.info(f"Games: {games}")
 
     for game in games:
-        await processGame(game)
+        await processGame(bot, game)

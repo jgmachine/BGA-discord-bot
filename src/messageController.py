@@ -3,17 +3,15 @@ from . import webscraper
 from src.database import Database
 import sqlite3
 from . import utils
-import botReference
 import os
 from dotenv import load_dotenv
-
 
 database = Database("database.db")
 load_dotenv()
 NOTIFY_CHANNEL_ID = os.getenv("NOTIFY_CHANNEL_ID")
 
 
-async def handleCommand(message):
+async def handleCommand(bot, message):
     command = message.content.lower()
 
     if command.startswith("!hello"):
@@ -61,7 +59,7 @@ async def handleCommand(message):
             await message.channel.send(
                 f"Monitoring to {gameName} with id: {gameId} at url: {urlParameter}"
             )
-            await notifyer(activePlayerId, gameId)
+            await notifyer(bot, activePlayerId, gameId)
 
         except Exception as e:
             logging.error(f"Error when monitoring: {e}")
@@ -87,11 +85,11 @@ async def handleCommand(message):
             await message.channel.send("Discord user ID already added!")
 
 
-async def notifyer(bgaId, gameId):
+async def notifyer(bot, bgaId, gameId):
     discordId = database.getDiscordIdByBgaId(bgaId)
     if discordId:
         mention = f"<@{discordId}>"
-        channel = botReference.bot.get_channel(NOTIFY_CHANNEL_ID)
+        channel = bot.get_channel(NOTIFY_CHANNEL_ID)
         game = database.getGameById(gameId)
         await channel.send(
             f"Det är din tur {mention} i {game.name}! [Länk]({game.url})"
