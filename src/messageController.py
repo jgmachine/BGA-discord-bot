@@ -106,3 +106,25 @@ async def notifyer(bot, bgaId, gameId):
             logging.info("Message sent successfully.")
         except Exception as e:
             logging.error(f"Failed to send message: {e}")
+
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
+
+    command = message.content.lower()
+
+    if command.startswith("!debug_users"):
+        try:
+            conn = sqlite3.connect("database.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_data")
+            rows = cursor.fetchall()
+            conn.close()
+
+            if rows:
+                await message.channel.send(f"Stored Users: {rows}")
+            else:
+                await message.channel.send("No users found in the database.")
+        except Exception as e:
+            await message.channel.send(f"Error accessing database: {e}")
