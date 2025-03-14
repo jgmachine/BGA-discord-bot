@@ -8,8 +8,7 @@ from dotenv import load_dotenv
 
 database = Database("database.db")
 load_dotenv()
-NOTIFY_CHANNEL_ID = os.getenv("NOTIFY_CHANNEL_ID")
-
+NOTIFY_CHANNEL_ID = int(os.getenv("NOTIFY_CHANNEL_ID", "0"))  # Ensure it's an integer
 
 async def handleCommand(bot, message):
     command = message.content.lower()
