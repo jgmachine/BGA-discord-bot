@@ -25,7 +25,7 @@ async def handleCommand(bot, message):
         try:
             _, gameId = command.split(" ", 1)
         except Exception:
-            await message.channel.send("Provide a game id to be removed")
+            await message.channel.send("Provide a game ID to be removed")
             return
 
         try:
@@ -35,12 +35,10 @@ async def handleCommand(bot, message):
             await message.channel.send(f"Not monitoring {game.name} with id: {game.id}")
 
         except Exception as e:
-            logging.error(f"Error when remoing game: {e}")
+            logging.error(f"Error when removing game: {e}")
             await message.channel.send(f"Could not remove game with id: {gameId}")
 
-    #!Listen_to command handling:
     elif command.startswith("!monitor"):
-        # Get url from command
         try:
             _, urlParameter = command.split(" ", 1)
         except Exception:
@@ -48,30 +46,26 @@ async def handleCommand(bot, message):
             return
 
         try:
-            # Get game id from game url
             gameId = utils.extractGameId(urlParameter)
-
-            # Get game name and current active player
             gameName, activePlayerId = await webscraper.getGameInfo(urlParameter)
 
             database.insertGameData(gameId, urlParameter, gameName, activePlayerId)
 
             await message.channel.send(
-                f"Monitoring to {gameName} with id: {gameId} at url: {urlParameter}"
+                f"Monitoring {gameName} with id: {gameId} at url: {urlParameter}"
             )
             await notifyer(bot, activePlayerId, gameId)
 
         except Exception as e:
             logging.error(f"Error when monitoring: {e}")
             await message.channel.send(
-                f"Something went wrong when trying to monitoring to game with url: {urlParameter}"
+                f"Something went wrong when trying to monitor game with url: {urlParameter}"
             )
 
-    #!Add_user command handling
     elif command.startswith("!add_user"):
         try:
             _, bgaId = command.split(" ", 1)
-        except Exception as e:
+        except Exception:
             await message.channel.send("Provide a BGA user ID")
             return
 
@@ -79,10 +73,27 @@ async def handleCommand(bot, message):
 
         try:
             database.insertUserData(discordId=discordId, bgaId=bgaId)
-            await message.channel.send("user added!")
+            await message.channel.send("User added!")
         except sqlite3.IntegrityError as e:
             logging.error(f"Error when adding user: {e}")
             await message.channel.send("Discord user ID already added!")
+
+    # ✅ **Move `!debug_users` inside `handleCommand()`**
+    elif command.startswith("!debug_users"):
+        try:
+            conn = sqlite3.connect("database.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user_data")
+            rows = cursor.fetchall()
+            conn.close()
+
+            if rows:
+                await message.channel.send(f"Stored Users: {rows}")
+            else:
+                await message.channel.send("No users found in the database.")
+        except Exception as e:
+            await message.channel.send(f"Error accessing database: {e}")
+            logging.error(f"Database error: {e}")
 
 
 async def notifyer(bot, bgaId, gameId):
@@ -106,25 +117,3 @@ async def notifyer(bot, bgaId, gameId):
             logging.info("Message sent successfully.")
         except Exception as e:
             logging.error(f"Failed to send message: {e}")
-
-
-async def on_message(message):
-    if message.author == bot.user:
-        return
-
-    command = message.content.lower()
-
-    if command.startswith("!debug_users"):
-        try:
-            conn = sqlite3.connect("database.db")
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM user_data")
-            rows = cursor.fetchall()
-            conn.close()
-
-            if rows:
-                await message.channel.send(f"Stored Users: {rows}")
-            else:
-                await message.channel.send("No users found in the database.")
-        except Exception as e:
-            await message.channel.send(f"Error accessing database: {e}")
