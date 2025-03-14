@@ -5,6 +5,7 @@ import sqlite3
 from . import utils
 import os
 from dotenv import load_dotenv
+from main import bot  # Import the bot instance
 
 database = Database("database.db")
 load_dotenv()
