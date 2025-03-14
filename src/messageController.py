@@ -86,11 +86,23 @@ async def handleCommand(bot, message):
 
 
 async def notifyer(bot, bgaId, gameId):
+    logging.info(f"notifyer() triggered for game {gameId} and player {bgaId}")
+
     discordId = database.getDiscordIdByBgaId(bgaId)
+    logging.info(f"Retrieved discordId: {discordId}")
+
     if discordId:
         mention = f"<@{discordId}>"
         channel = bot.get_channel(NOTIFY_CHANNEL_ID)
+        logging.info(f"Channel found: {channel}")
+
         game = database.getGameById(gameId)
-        await channel.send(
-            f"Det är din tur {mention} i {game.name}! [Länk]({game.url})"
-        )
+        logging.info(f"Retrieved game: {game}")
+
+        try:
+            await channel.send(
+                f"It's your turn {mention} in {game.name}! [Link]({game.url})"
+            )
+            logging.info("Message sent successfully.")
+        except Exception as e:
+            logging.error(f"Failed to send message: {e}")
