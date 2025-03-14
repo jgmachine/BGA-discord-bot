@@ -5,7 +5,6 @@ import sqlite3
 from . import utils
 import os
 from dotenv import load_dotenv
-from main import bot  # Import the bot instance
 
 database = Database("database.db")
 load_dotenv()
@@ -108,7 +107,7 @@ async def notifyer(bot, bgaId, gameId):
         except Exception as e:
             logging.error(f"Failed to send message: {e}")
 
-@bot.event
+
 async def on_message(message):
     if message.author == bot.user:
         return
