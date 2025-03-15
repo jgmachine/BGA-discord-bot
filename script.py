@@ -15,15 +15,20 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-database = Database("/data/database.db")
-logging.info(f"[DATABASE] Using path: /data/database.db")  # ✅ Debug log to verify
+# 🔧 Ensure database path is correct
+DATABASE_PATH = "/data/database.db"  # Persistent storage in Railway
+database = Database(DATABASE_PATH)
+
+logging.info(f"[DATABASE] Using path: {DATABASE_PATH}")
+
+# ✅ Force table creation on startup
+database.createTables()
+logging.info("[DATABASE] Tables checked/created successfully.")
 
 @bot.event
 async def on_ready():
     logging.info(f"We have logged in as {bot.user}")
-    database.createTables()
-    taskService.processGames.start(bot)
-
+    taskService.processGames.start(bot)  # Ensure this is started after tables exist
 
 @bot.event
 async def on_message(message):
@@ -31,7 +36,6 @@ async def on_message(message):
         return
     else:
         await messageController.handleCommand(bot, message)
-
 
 if __name__ == "__main__":
     try:
