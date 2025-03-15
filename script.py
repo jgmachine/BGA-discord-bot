@@ -1,6 +1,7 @@
 from src import loggingConfig
 import logging
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from src import messageController
 import discord
@@ -10,38 +11,48 @@ from src import taskService
 
 print("🚀 The script is starting...")
 
-
 # Load environment variables
 load_dotenv()
 loggingConfig.setupLogging()
 logging.basicConfig(level=logging.INFO)
-
 logging.info("🚀 Starting the bot script.")
 logging.info(f"🔍 Current Working Directory: {os.getcwd()}")
 
+# Set up Discord bot
 TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True
-
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-DB_PATH = "/data/database.db"
-database = Database(DB_PATH)  
+# Set up database with persistent storage path
+DB_DIR = Path("/data")
+# Ensure the directory exists with proper permissions
+DB_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DB_DIR / "database.db"
 
-if database:
-    logging.info(f"✅ Database instance successfully created at {DB_PATH}!")
-else:
-    logging.error("❌ Database instance creation failed!")
+# Add debug checks for the database path
+logging.info(f"🔍 Database directory path: {DB_DIR}")
+logging.info(f"🔍 Database file path: {DB_PATH}")
+logging.info(f"🔍 Database directory exists: {DB_DIR.exists()}")
+logging.info(f"🔍 Database directory is writable: {os.access(DB_DIR, os.W_OK)}")
 
-# Call `connect` to ensure the database file exists
-database.connect()
+# Create database instance
+database = Database(DB_PATH)
+logging.info(f"✅ Database instance created with path: {DB_PATH}")
 
-# Force table creation immediately to verify it works
+# Initialize database schema
 try:
+    # This will connect, create tables, and close the connection
     database.createTables()
-    logging.info("✅ Tables checked/created successfully.")
+    
+    # Verify the database file was created
+    if DB_PATH.exists():
+        logging.info(f"✅ Database file successfully created at {DB_PATH}")
+        logging.info(f"✅ Database file size: {DB_PATH.stat().st_size} bytes")
+    else:
+        logging.error(f"❌ Database file was not created at {DB_PATH}")
 except Exception as e:
-    logging.error(f"❌ Table creation failed: {e}")
+    logging.error(f"❌ Database initialization failed: {e}")
 
 @bot.event
 async def on_ready():
