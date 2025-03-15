@@ -8,27 +8,23 @@ from discord.ext import commands
 from src.database import Database
 from src import taskService
 
+# Load environment variables
 load_dotenv()
 loggingConfig.setupLogging()
+
 TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# 🔧 Ensure database path is correct
-DATABASE_PATH = "/data/database.db"  # Persistent storage in Railway
-database = Database(DATABASE_PATH)
-
-logging.info(f"[DATABASE] Using path: {DATABASE_PATH}")
-
-# ✅ Force table creation on startup
-database.createTables()
-logging.info("[DATABASE] Tables checked/created successfully.")
+# Initialize Database (tables are automatically created in the constructor)
+database = Database()
 
 @bot.event
 async def on_ready():
     logging.info(f"We have logged in as {bot.user}")
-    taskService.processGames.start(bot)  # Ensure this is started after tables exist
+    taskService.processGames.start(bot)  # Keep this if still relevant
 
 @bot.event
 async def on_message(message):
@@ -42,4 +38,3 @@ if __name__ == "__main__":
         bot.run(TOKEN)
     finally:
         logging.info("Closing down.")
-        database.close()
