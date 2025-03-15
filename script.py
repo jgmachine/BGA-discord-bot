@@ -15,8 +15,8 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-database = Database("database.db")
-
+database = Database("/data/database.db")
+logging.info(f"[DATABASE] Using path: /data/database.db")  # ✅ Debug log to verify
 
 @bot.event
 async def on_ready():
