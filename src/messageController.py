@@ -115,7 +115,7 @@ async def notifyer(bot, bgaId, gameId):
 
         try:
             await channel.send(
-                f"It's your turn {mention} in {game.name}! [Link]({game.url})"
+                f"It's your turn {mention} in [{game.name}]({game.url})!"
             )
             logging.info("Message sent successfully.")
         except Exception as e:
