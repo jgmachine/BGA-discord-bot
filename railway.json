@@ -1,0 +1,8 @@
+{
+    "volumes": [
+      {
+        "path": "/data",
+        "persistent": true
+      }
+    ]
+  }
