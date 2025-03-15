@@ -8,6 +8,9 @@ from discord.ext import commands
 from src.database import Database
 from src import taskService
 
+print("🚀 The script is starting...")
+
+
 # Load environment variables
 load_dotenv()
 loggingConfig.setupLogging()
