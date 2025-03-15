@@ -1,3 +1,5 @@
+print("🚀 The script is starting...")
+
 from src import loggingConfig
 import logging
 import os
@@ -8,8 +10,6 @@ import discord
 from discord.ext import commands
 from src.database import Database
 from src import taskService
-
-print("🚀 The script is starting...")
 
 # Load environment variables
 load_dotenv()
@@ -39,6 +39,7 @@ logging.info(f"🔍 Database directory is writable: {os.access(DB_DIR, os.W_OK)}
 # Create database instance
 database = Database(DB_PATH)
 logging.info(f"✅ Database instance created with path: {DB_PATH}")
+print(f"✅ DATABASE SETUP COMPLETE - Path: {DB_PATH}")
 
 # Initialize database schema
 try:
