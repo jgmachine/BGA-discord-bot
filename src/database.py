@@ -1,23 +1,26 @@
-import sqlite3
-import logging
 import os
+import logging
+from pathlib import Path
+import sqlite3
 from collections import namedtuple
 
-# ✅ Store SQLite in Railway's persistent directory
-DB_PATH = "/data/database.db"
+# Ensure the /data directory exists
+DB_PATH = Path("/data/database.db")
 
 Game = namedtuple("Game", ["id", "url", "name", "activePlayerId"])
 
 
 class Database:
-    def __init__(self):
-        os.makedirs("/data", exist_ok=True)  # Ensure the directory exists
-        self.db_file = DB_PATH
+    def __init__(self, db_file=DB_PATH):
+        self.db_file = db_file
         self.conn = None
         self.cursor = None
 
+        # Log the database path
+        logging.info(f"Database initialized at: {self.db_file}")
+
     def connect(self):
-        """Open a connection to the database."""
+        logging.info(f"Connecting to database at: {self.db_file}")
         self.conn = sqlite3.connect(self.db_file)
         self.cursor = self.conn.cursor()
 
