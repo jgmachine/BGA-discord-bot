@@ -11,6 +11,10 @@ from src import taskService
 # Load environment variables
 load_dotenv()
 loggingConfig.setupLogging()
+logging.basicConfig(level=logging.INFO)
+
+logging.info("🚀 Starting the bot script.")
+logging.info(f"🔍 Current Working Directory: {os.getcwd()}")
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.default()
@@ -18,8 +22,23 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Initialize Database (tables are automatically created in the constructor)
-database = Database()
+DB_PATH = "/data/database.db"
+database = Database(DB_PATH)  
+
+if database:
+    logging.info(f"✅ Database instance successfully created at {DB_PATH}!")
+else:
+    logging.error("❌ Database instance creation failed!")
+
+# Call `connect` to ensure the database file exists
+database.connect()
+
+# Force table creation immediately to verify it works
+try:
+    database.createTables()
+    logging.info("✅ Tables checked/created successfully.")
+except Exception as e:
+    logging.error(f"❌ Table creation failed: {e}")
 
 @bot.event
 async def on_ready():
