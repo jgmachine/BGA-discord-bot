@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from . import webscraper
 from src.database import Database
 import sqlite3
@@ -6,7 +7,9 @@ from . import utils
 import os
 from dotenv import load_dotenv
 
-database = Database("database.db")
+# Use the persistent database path
+DB_PATH = Path("/data/database.db")
+database = Database(DB_PATH)
 load_dotenv()
 NOTIFY_CHANNEL_ID = int(os.getenv("NOTIFY_CHANNEL_ID", "0"))  # Ensure it's an integer
 
@@ -77,10 +80,11 @@ async def handleCommand(bot, message):
             logging.error(f"Error when adding user: {e}")
             await message.channel.send("Discord user ID already added!")
 
-    # ✅ **Move `!debug_users` inside `handleCommand()`**
+    # Updated !debug_users to use the persistent database path
     elif command.startswith("!debug_users"):
         try:
-            conn = sqlite3.connect("database.db")
+            # Use the same DB_PATH for consistency
+            conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_data")
             rows = cursor.fetchall()
