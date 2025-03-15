@@ -93,6 +93,15 @@ class Database:
     # 🔹 GAME MANAGEMENT FUNCTIONS
     # ───────────────────────────────────────────────────────────────
 
+    def getAllGames(self):
+        """Retrieve all games."""
+        self.connect()
+        self.cursor.execute("SELECT id, url, game_name, active_player_id FROM game_data")
+        games = self.cursor.fetchall()
+        self.close()
+        return [Game(*game) for game in games]
+
+
     def insert_game(self, game_id, url, game_name, active_player_id):
         """✅ Adds a new game entry."""
         try:
