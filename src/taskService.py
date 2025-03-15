@@ -4,7 +4,8 @@ from . import webscraper
 from src.database import Database
 from . import messageController
 
-database = Database("database.db")
+DB_PATH = Path("/data/database.db")
+database = Database(DB_PATH)
 
 
 # Fetching active player id for a game entity
