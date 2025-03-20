@@ -28,7 +28,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ✅ Insert Here: Define the function to load commands dynamically
 async def load_commands():
     """Loads all commands dynamically from the `commands/` folder."""
-    await bot.load_extension("src.commands.hosting_rotation")  # Load hosting rotation commands
+    await bot.load_extension("commands.hosting_rotation")
     logging.info("✅ Bot commands have been loaded successfully.")
 
 # Set up database with persistent storage path
