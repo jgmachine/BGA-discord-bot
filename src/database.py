@@ -52,13 +52,103 @@ class Database:
             )
         """
         )
+        self.createHostingTable()
         self.conn.commit()
         self.close()
         logging.info("[DATABASE] Tables checked/created successfully.")
 
     # ───────────────────────────────────────────────────────────────
+    # 🔹 HOSTING ROTATION FUNCTIONS
+    # ───────────────────────────────────────────────────────────────
+
+    def createHostingTable(self):
+        """🔹 Creates the hosting rotation table if it doesn't exist."""
+        self.cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS hosting_rotation (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                discord_id TEXT UNIQUE NOT NULL,
+                username TEXT NOT NULL,
+                order_position INTEGER NOT NULL,
+                last_hosted DATE,
+                active INTEGER DEFAULT 1
+            )
+            '''
+        )
+
+    def addHost(self, discord_id, username):
+        """Adds a user to the hosting rotation."""
+        self.connect()
+        cursor = self.cursor
+
+        # Get the next available order position
+        cursor.execute("SELECT MAX(order_position) FROM hosting_rotation")
+        max_pos = cursor.fetchone()[0]
+        next_position = (max_pos + 1) if max_pos else 1
+
+        cursor.execute("INSERT OR IGNORE INTO hosting_rotation (discord_id, username, order_position) VALUES (?, ?, ?)",
+                       (discord_id, username, next_position))
+        
+        self.conn.commit()
+        self.close()
+
+    def getNextHost(self):
+        """Fetches the next user in the hosting rotation."""
+        self.connect()
+        cursor = self.cursor
+        
+        cursor.execute("SELECT username FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC LIMIT 1")
+        next_host = cursor.fetchone()
+        self.close()
+
+        return next_host[0] if next_host else None
+
+    def rotateHosts(self):
+        """Moves the current host to the back of the queue."""
+        self.connect()
+        cursor = self.cursor
+
+        # Get the current host
+        cursor.execute("SELECT discord_id, order_position FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC LIMIT 1")
+        host = cursor.fetchone()
+
+        if not host:
+            self.close()
+            return "No active hosts found."
+
+        host_id, host_position = host
+
+        # Move the host to the back
+        cursor.execute("UPDATE hosting_rotation SET order_position = order_position - 1 WHERE order_position > ?", (host_position,))
+        cursor.execute("UPDATE hosting_rotation SET order_position = (SELECT MAX(order_position) + 1 FROM hosting_rotation) WHERE discord_id = ?", (host_id,))
+
+        self.conn.commit()
+        self.close()
+
+    def deferHost(self, discord_id):
+        """Keeps a host at the top until the next available date."""
+        self.connect()
+        cursor = self.cursor
+
+        # Keep them at the top, move others forward
+        cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1 WHERE order_position > 1")
+        
+        self.conn.commit()
+        self.close()
+
+    def snoozeHost(self, discord_id):
+        """Temporarily removes a user from the hosting rotation."""
+        self.connect()
+        cursor = self.cursor
+        cursor.execute("UPDATE hosting_rotation SET active=0 WHERE discord_id=?", (discord_id,))
+        
+        self.conn.commit()
+        self.close()
+
+    # ───────────────────────────────────────────────────────────────
     # 🔹 USER MANAGEMENT FUNCTIONS
     # ───────────────────────────────────────────────────────────────
+
 
     def insertUserData(self, discordId, bgaId):
         """✅ Adds a new user to the database."""
