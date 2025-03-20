@@ -10,6 +10,7 @@ import discord
 from discord.ext import commands
 from src.database import Database
 from src import taskService
+import asyncio  # ✅ Required for async functions
 
 # Load environment variables
 load_dotenv()
@@ -23,6 +24,12 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# ✅ Insert Here: Define the function to load commands dynamically
+async def load_commands():
+    """Loads all commands dynamically from the `commands/` folder."""
+    await bot.load_extension("src.commands.hosting_rotation")  # Load hosting rotation commands
+    logging.info("✅ Bot commands have been loaded successfully.")
 
 # Set up database with persistent storage path
 DB_DIR = Path("/data")
@@ -55,10 +62,16 @@ try:
 except Exception as e:
     logging.error(f"❌ Database initialization failed: {e}")
 
+# ✅ Modify the existing on_ready() function to load commands dynamically
 @bot.event
 async def on_ready():
-    logging.info(f"We have logged in as {bot.user}")
-    taskService.processGames.start(bot)  # Keep this if still relevant
+    logging.info(f"✅ We have logged in as {bot.user}")
+    
+    # ✅ Load bot commands when the bot starts
+    await load_commands()
+    
+    # ✅ If taskService is still relevant, keep this
+    taskService.processGames.start(bot)
 
 @bot.event
 async def on_message(message):
