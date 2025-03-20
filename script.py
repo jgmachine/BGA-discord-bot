@@ -25,11 +25,11 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ✅ Insert Here: Define the function to load commands dynamically
+# ✅ Update this function to reflect the move of `hosting_rotation.py`
 async def load_commands():
-    """Loads all commands dynamically from the `commands/` folder."""
-    await bot.load_extension("commands.hosting_rotation")
-    logging.info("✅ Bot commands have been loaded successfully.")
+    """Loads all commands dynamically from the `src/` folder."""
+    await bot.load_extension("src.hosting_rotation")  # ✅ Fixed path
+    logging.info("✅ Hosting rotation commands loaded successfully.")
 
 # Set up database with persistent storage path
 DB_DIR = Path("/data")
