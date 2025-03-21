@@ -99,6 +99,37 @@ class HostingRotationCommands(commands.Cog):
         await ctx.send(f"🔔 {member.name} has been reactivated in the rotation.")
         logger.info(f"✅ {member.name} has been reactivated. {result}")
 
+    @commands.command()
+    @in_allowed_channel()
+    async def rotation_list(self, ctx):
+        """Displays the current hosting rotation order."""
+        logger.info("🔄 Received command: !rotation_list")
+
+        # Get all hosts in rotation order
+        hosts = database.getAllHosts()
+        
+        if hosts:
+            # Create an embedded message for nicer formatting
+            embed = discord.Embed(
+                title="🎲 Current Hosting Rotation",
+                description="The current order of game hosts:",
+                color=discord.Color.blue()
+            )
+            
+            # Add hosts to the embed
+            for host in hosts:
+                embed.add_field(
+                    name=f"{host['position']}. {host['username']}", 
+                    value=f"Position: {host['position']}", 
+                    inline=False
+                )
+            
+            await ctx.send(embed=embed)
+            logger.info(f"✅ Displayed rotation list with {len(hosts)} hosts")
+        else:
+            await ctx.send("❌ No active hosts found in the rotation.")
+            logger.warning("⚠️ No active hosts found for rotation list.")
+
 # Required Setup Function for Bot Extensions
 async def setup(bot):
     await bot.add_cog(HostingRotationCommands(bot))

@@ -316,6 +316,33 @@ class Database:
     def activate_host(self, discord_id):
         """Alias for activateHost using snake_case naming convention."""
         return self.activateHost(discord_id)
+    
+    def getAllHosts(self):
+        """Returns all active hosts in their current rotation order."""
+        host_logger.info("Fetching all hosts in rotation order")
+        try:
+            self.connect()
+            cursor = self.cursor
+            
+            cursor.execute("SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC")
+            hosts = cursor.fetchall()
+            self.close()
+            
+            if hosts:
+                host_logger.info(f"Retrieved {len(hosts)} hosts in rotation order")
+                return [{"discord_id": host[0], "username": host[1], "position": host[2]} for host in hosts]
+            else:
+                host_logger.warning("No active hosts found in rotation")
+                return []
+        except Exception as e:
+            host_logger.error(f"Error fetching all hosts: {e}")
+            self.close()
+            raise
+
+    # Alias with snake_case naming convention
+    def get_all_hosts(self):
+        """Alias for getAllHosts using snake_case naming convention."""
+        return self.getAllHosts()
 
     # ───────────────────────────────────────────────────────────────
     # 🔹 USER MANAGEMENT FUNCTIONS 
