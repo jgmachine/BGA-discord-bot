@@ -171,6 +171,7 @@ class Database:
         try:
             self.connect()
             cursor = self.cursor
+            
             # Get the current host
             cursor.execute("SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC LIMIT 1")
             host = cursor.fetchone()
@@ -185,14 +186,30 @@ class Database:
             # Update last_hosted date for the current host
             cursor.execute("UPDATE hosting_rotation SET last_hosted = DATE('now') WHERE discord_id = ?", (host_id,))
             
-            # Move the host to the back
-            cursor.execute("UPDATE hosting_rotation SET order_position = order_position - 1 WHERE order_position > ?", (host_position,))
-            cursor.execute("SELECT MAX(order_position) FROM hosting_rotation")
+            # Get the maximum position number from active hosts
+            cursor.execute("SELECT MAX(order_position) FROM hosting_rotation WHERE active=1")
             max_pos = cursor.fetchone()[0] or 0
-            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", (max_pos, host_id,))
+            
+            # Move the current host to the back
+            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+                        (max_pos + 1, host_id))  # Set to max_pos + 1 temporarily
+            
+            # Decrement everyone else's position
+            cursor.execute("UPDATE hosting_rotation SET order_position = order_position - 1 WHERE discord_id != ? AND active=1", 
+                        (host_id,))
+            
+            # Make the current host's position consistent with the new max
+            cursor.execute("SELECT MAX(order_position) FROM hosting_rotation WHERE active=1 AND discord_id != ?", 
+                        (host_id,))
+            new_max = cursor.fetchone()[0] or 0
+            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+                        (new_max + 1, host_id))
+            
+            # Run a final pass to ensure sequential ordering (no gaps)
+            self._resequencePositions()
             
             self.conn.commit()
-            host_logger.info(f"Host {host_name} rotated to position {max_pos}")
+            host_logger.info(f"Host {host_name} rotated to the end of the queue")
             self.close()
             return f"Rotated: {host_name} moved to the end of the queue"
         except Exception as e:
@@ -207,28 +224,31 @@ class Database:
         return self.rotateHosts()
 
     def deferHost(self, discord_id):
-        """Keeps a host at the top until the next available date."""
+        """Defers a host (keeps them at their current position)."""
         host_logger.info(f"Deferring host with discord_id={discord_id}")
         try:
             self.connect()
             cursor = self.cursor
             
             # Verify the host exists and is active
-            cursor.execute("SELECT username FROM hosting_rotation WHERE discord_id=? AND active=1", (discord_id,))
+            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", (discord_id,))
             host = cursor.fetchone()
             if not host:
                 host_logger.warning(f"Host with discord_id={discord_id} not found or not active")
                 self.close()
                 return "Host not found or not active"
                 
-            # Keep them at the top, move others forward
-            cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1 WHERE discord_id != ? AND active=1", (discord_id,))
-            cursor.execute("UPDATE hosting_rotation SET order_position = 1 WHERE discord_id = ?", (discord_id,))
+            username, position = host
+            
+            # No need to change the position of the deferred host
+            # Just log that they have been deferred
+            cursor.execute("UPDATE hosting_rotation SET last_hosted = DATE('now', '-7 days') WHERE discord_id = ?", 
+                        (discord_id,))
             
             self.conn.commit()
-            host_logger.info(f"Host {host[0]} deferred successfully")
+            host_logger.info(f"Host {username} deferred successfully (keeping position {position})")
             self.close()
-            return f"Deferred: {host[0]} kept at the top of the queue"
+            return f"Deferred: {username} has deferred their turn"
         except Exception as e:
             host_logger.error(f"Error deferring host: {e}")
             self.conn.rollback()
@@ -324,6 +344,9 @@ class Database:
             self.connect()
             cursor = self.cursor
             
+            # Ensure there are no gaps in positions before fetching
+            self._resequencePositions()
+            
             cursor.execute("SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC")
             hosts = cursor.fetchall()
             self.close()
@@ -343,6 +366,23 @@ class Database:
     def get_all_hosts(self):
         """Alias for getAllHosts using snake_case naming convention."""
         return self.getAllHosts()
+
+    def _resequencePositions(self):
+        """Helper method to ensure host positions are sequential (1, 2, 3...) with no gaps."""
+        try:
+            # Get all active hosts ordered by their current position
+            self.cursor.execute("SELECT discord_id FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC")
+            hosts = self.cursor.fetchall()
+            
+            # Reassign positions sequentially
+            for idx, host in enumerate(hosts, 1):
+                self.cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+                                (idx, host[0]))
+            
+            host_logger.info(f"Resequenced positions for {len(hosts)} active hosts")
+        except Exception as e:
+            host_logger.error(f"Error resequencing positions: {e}")
+            raise
 
     # ───────────────────────────────────────────────────────────────
     # 🔹 USER MANAGEMENT FUNCTIONS 
