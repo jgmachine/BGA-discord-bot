@@ -287,6 +287,66 @@ class HostingRotationCommands(commands.Cog):
             database.close()
             await ctx.send("❌ An error occurred while processing this command.")
 
+    @commands.command()
+    @in_allowed_channel()
+    async def hosting_help(self, ctx):
+        """Displays help information for all hosting rotation commands."""
+        logger.info("🔄 Received command: !hosting_help")
+        
+        # Create an embedded message for help information
+        embed = discord.Embed(
+            title="🎲 Hosting Rotation Commands",
+            description="Here are all the commands available for managing the game hosting rotation:",
+            color=discord.Color.blue()
+        )
+        
+        # Basic commands
+        embed.add_field(
+            name="📋 View Commands",
+            value=(
+                "**`!next_host`** - Shows who's next in the rotation\n"
+                "**`!rotation_list`** - Displays the complete hosting order"
+            ),
+            inline=False
+        )
+        
+        # Rotation management
+        embed.add_field(
+            name="🔄 Rotation Commands",
+            value=(
+                "**`!rotate_hosts`** - Moves the current host to the back\n"
+                "**`!defer_host @user`** - User keeps their position but skips their turn\n"
+                "**`!force_host @user`** - Moves user to the top of the rotation\n"
+                "**`!send_to_back @user`** - Moves user to the end of the rotation\n"
+                "**`!swap_position @user1 @user2`** - Swaps the positions of two users"
+            ),
+            inline=False
+        )
+        
+        # User management
+        embed.add_field(
+            name="👤 User Management",
+            value=(
+                "**`!add_host @user`** - Adds a new user to the rotation\n"
+                "**`!snooze_host @user`** - Temporarily removes user from rotation\n"
+                "**`!activate_host @user`** - Brings a snoozed user back into rotation"
+            ),
+            inline=False
+        )
+        
+        # Help
+        embed.add_field(
+            name="❓ Help",
+            value="**`!hosting_help`** - Shows this help message",
+            inline=False
+        )
+        
+        # Add a footer
+        embed.set_footer(text="Commands must be used in the designated channel")
+        
+        await ctx.send(embed=embed)
+        logger.info("✅ Displayed hosting help information")
+
 # Required Setup Function for Bot Extensions
 async def setup(bot):
     await bot.add_cog(HostingRotationCommands(bot))
