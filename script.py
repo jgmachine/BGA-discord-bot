@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 from src.database import Database
 from src import taskService
-import asyncio  # ✅ Required for async functions
+import asyncio  # Required for async functions
 
 # Load environment variables
 load_dotenv()
@@ -25,11 +25,14 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ✅ Update this function to reflect the move of `hosting_rotation.py`
+# Update this function to reflect the correct extension path
 async def load_commands():
     """Loads all commands dynamically from the `src/` folder."""
-    await bot.load_extension("src.hosting_rotation")  # ✅ Fixed path
-    logging.info("✅ Hosting rotation commands loaded successfully.")
+    try:
+        await bot.load_extension("src.hosting_rotation")  # Fixed path
+        logging.info("✅ Hosting rotation commands loaded successfully.")
+    except Exception as e:
+        logging.error(f"❌ Failed to load hosting_rotation extension: {e}")
 
 # Set up database with persistent storage path
 DB_DIR = Path("/data")
@@ -62,26 +65,40 @@ try:
 except Exception as e:
     logging.error(f"❌ Database initialization failed: {e}")
 
-# ✅ Modify the existing on_ready() function to load commands dynamically
+# Modify the existing on_ready() function to handle commands
 @bot.event
 async def on_ready():
     logging.info(f"✅ We have logged in as {bot.user}")
     
-    # ✅ Load bot commands when the bot starts
+    # Load bot commands when the bot starts
     await load_commands()
     
-    # ✅ If taskService is still relevant, keep this
-    taskService.processGames.start(bot)
+    # Start the task service if it's still relevant
+    try:
+        taskService.processGames.start(bot)
+        logging.info("✅ Task service started successfully.")
+    except Exception as e:
+        logging.error(f"❌ Failed to start task service: {e}")
 
+# Process messages
 @bot.event
 async def on_message(message):
+    # Prevent responding to bot's own messages
     if message.author.bot:
         return
-    else:
-        await messageController.handleCommand(bot, message)
+    
+    # Process commands from the message
+    await bot.process_commands(message)
+    
+    # Handle custom command processing if needed
+    await messageController.handleCommand(bot, message)
 
 if __name__ == "__main__":
     try:
         bot.run(TOKEN)
+    except discord.errors.LoginFailure:
+        logging.error("❌ Invalid Discord token. Please check your .env file.")
+    except Exception as e:
+        logging.error(f"❌ Error starting the bot: {e}")
     finally:
         logging.info("Closing down.")

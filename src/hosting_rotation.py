@@ -1,9 +1,14 @@
 import discord
 from discord.ext import commands
-import src.database as db  # ✅ Import database module properly
+import logging
+from pathlib import Path
+from src.database import Database
 
-# ✅ Define Allowed Channel for Commands (Replace with your actual channel ID)
-ALLOWED_CHANNEL_ID = 1315906887312605194  # 🔴 Update this with your correct Discord channel ID
+# Setup Logging for Commands
+logger = logging.getLogger(__name__)
+
+# Define Allowed Channel for Commands (Replace with your actual channel ID)
+ALLOWED_CHANNEL_ID = 1315906887312605194  # Update this with your correct Discord channel ID
 
 def in_allowed_channel():
     """Decorator to restrict commands to a specific channel."""
@@ -11,8 +16,10 @@ def in_allowed_channel():
         return ctx.channel.id == ALLOWED_CHANNEL_ID
     return commands.check(predicate)
 
-# ✅ Create a Database Instance
-database = db.Database(db.DB_PATH)  # Use the database class instance
+# Create a Database Instance - Use the DB_PATH from database.py correctly
+DB_DIR = Path("/data")
+DB_PATH = DB_DIR / "database.db"
+database = Database(DB_PATH)  # Use the database class with proper path
 
 class HostingRotationCommands(commands.Cog):
     """Commands for managing the hosting rotation."""
@@ -24,40 +31,75 @@ class HostingRotationCommands(commands.Cog):
     @in_allowed_channel()
     async def add_host(self, ctx, member: discord.Member):
         """Adds a user to the hosting rotation."""
-        database.add_host(str(member.id), member.name)  # ✅ Corrected function call
+        logger.info(f"🔄 Received command: !add_host {member.name} (ID: {member.id})")
+
+        # Fix: Use camelCase function name to match database.py implementation
+        database.addHost(str(member.id), member.name)
         await ctx.send(f"✅ {member.name} has been added to the hosting rotation!")
+
+        # Log confirmation
+        logger.info(f"✅ Successfully added {member.name} (ID: {member.id}) to the hosting rotation.")
 
     @commands.command()
     @in_allowed_channel()
     async def next_host(self, ctx):
         """Displays the next host in the rotation."""
-        host = database.get_next_host()  # ✅ Call method from database instance
+        logger.info("🔄 Received command: !next_host")
+
+        # Fix: Use camelCase function name to match database.py implementation
+        host = database.getNextHost()
         if host:
-            await ctx.send(f"🎲 The next host is: **{host}**")
+            await ctx.send(f"🎲 The next host is: **{host['username']}**")
+            logger.info(f"✅ Next host: {host['username']}")
         else:
             await ctx.send("❌ No active hosts found.")
+            logger.warning("⚠️ No active hosts found.")
 
     @commands.command()
     @in_allowed_channel()
     async def rotate_hosts(self, ctx):
         """Moves the current host to the back of the queue."""
-        database.rotate_hosts()  # ✅ Call method from database instance
+        logger.info("🔄 Received command: !rotate_hosts")
+
+        # Fix: Use camelCase function name to match database.py implementation
+        result = database.rotateHosts()
         await ctx.send("✅ Hosting rotation updated!")
+        logger.info(f"✅ Hosting rotation has been updated. {result}")
 
     @commands.command()
     @in_allowed_channel()
     async def defer_host(self, ctx, member: discord.Member):
         """Allows a user to defer their hosting turn."""
-        database.defer_host(str(member.id))  # ✅ Call method from database instance
+        logger.info(f"🔄 Received command: !defer_host {member.name}")
+
+        # Fix: Use camelCase function name to match database.py implementation
+        result = database.deferHost(str(member.id))
         await ctx.send(f"✅ {member.name} has deferred their turn.")
+        logger.info(f"✅ {member.name} has deferred their hosting turn. {result}")
 
     @commands.command()
     @in_allowed_channel()
     async def snooze_host(self, ctx, member: discord.Member):
         """Temporarily removes a user from the hosting rotation."""
-        database.snooze_host(str(member.id))  # ✅ Call method from database instance
-        await ctx.send(f"😴 {member.name} has been snoozed.")
+        logger.info(f"🔄 Received command: !snooze_host {member.name}")
 
-# ✅ Required Setup Function for Bot Extensions
+        # Fix: Use camelCase function name to match database.py implementation
+        result = database.snoozeHost(str(member.id))
+        await ctx.send(f"😴 {member.name} has been snoozed.")
+        logger.info(f"✅ {member.name} has been snoozed. {result}")
+    
+    @commands.command()
+    @in_allowed_channel()
+    async def activate_host(self, ctx, member: discord.Member):
+        """Reactivates a snoozed user in the hosting rotation."""
+        logger.info(f"🔄 Received command: !activate_host {member.name}")
+
+        # Fix: Use camelCase function name to match database.py implementation
+        result = database.activateHost(str(member.id))
+        await ctx.send(f"🔔 {member.name} has been reactivated in the rotation.")
+        logger.info(f"✅ {member.name} has been reactivated. {result}")
+
+# Required Setup Function for Bot Extensions
 async def setup(bot):
     await bot.add_cog(HostingRotationCommands(bot))
+    logger.info("✅ HostingRotationCommands cog has been loaded.")
