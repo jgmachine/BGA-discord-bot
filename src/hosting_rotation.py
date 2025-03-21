@@ -8,12 +8,12 @@ from src.database import Database
 logger = logging.getLogger(__name__)
 
 # Define Allowed Channel for Commands (Replace with your actual channel ID)
-ALLOWED_CHANNEL_ID = 1315906887312605194  # Update this with your correct Discord channel ID
+HOSTING_ROTATION_CHANNEL_ID = os.getenv("HOSTING_ROTATION_CHANNEL_ID")
 
 def in_allowed_channel():
     """Decorator to restrict commands to a specific channel."""
     async def predicate(ctx):
-        return ctx.channel.id == ALLOWED_CHANNEL_ID
+        return ctx.channel.id == HOSTING_ROTATION_CHANNEL_ID
     return commands.check(predicate)
 
 # Create a Database Instance - Use the DB_PATH from database.py correctly
