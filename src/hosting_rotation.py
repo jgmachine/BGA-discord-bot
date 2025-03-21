@@ -129,6 +129,163 @@ class HostingRotationCommands(commands.Cog):
         else:
             await ctx.send("❌ No active hosts found in the rotation.")
             logger.warning("⚠️ No active hosts found for rotation list.")
+            
+    @commands.command()
+    @in_allowed_channel()
+    async def force_host(self, ctx, member: discord.Member):
+        """Force a user to the top of the hosting rotation."""
+        logger.info(f"🔄 Received command: !force_host {member.name}")
+
+        try:
+            database.connect()
+            cursor = database.cursor
+            
+            # Verify the host exists and is active
+            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
+                           (str(member.id),))
+            host = cursor.fetchone()
+            if not host:
+                await ctx.send(f"❌ {member.name} not found in active rotation.")
+                logger.warning(f"Host {member.name} not found or not active for force command")
+                database.close()
+                return
+                
+            username, current_position = host
+            logger.info(f"Found host {username} at position {current_position}")
+            
+            # If already at position 1, no need to change
+            if current_position == 1:
+                await ctx.send(f"ℹ️ {username} is already at the top of the rotation.")
+                database.close()
+                return
+            
+            # Increment everyone's position who is ahead of this user
+            cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1 WHERE order_position < ? AND active=1", 
+                         (current_position,))
+            
+            # Move this user to position 1
+            cursor.execute("UPDATE hosting_rotation SET order_position = 1 WHERE discord_id = ?", 
+                         (str(member.id),))
+            
+            database.conn.commit()
+            database.close()
+            
+            await ctx.send(f"✅ {username} has been moved to the top of the rotation!")
+            logger.info(f"✅ {username} has been moved to the top of the rotation")
+            
+        except Exception as e:
+            logger.error(f"Error in force_host command: {e}")
+            database.conn.rollback()
+            database.close()
+            await ctx.send("❌ An error occurred while processing this command.")
+
+    @commands.command()
+    @in_allowed_channel()
+    async def swap_position(self, ctx, member1: discord.Member, member2: discord.Member):
+        """Swap the positions of two users in the hosting rotation."""
+        logger.info(f"🔄 Received command: !swap_position {member1.name} {member2.name}")
+        
+        try:
+            database.connect()
+            cursor = database.cursor
+            
+            # Verify both hosts exist and are active
+            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
+                           (str(member1.id),))
+            host1 = cursor.fetchone()
+            
+            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
+                           (str(member2.id),))
+            host2 = cursor.fetchone()
+            
+            if not host1 or not host2:
+                missing = []
+                if not host1:
+                    missing.append(member1.name)
+                if not host2:
+                    missing.append(member2.name)
+                    
+                await ctx.send(f"❌ {', '.join(missing)} not found in active rotation.")
+                logger.warning(f"Hosts not found or not active for swap command: {', '.join(missing)}")
+                database.close()
+                return
+                
+            username1, position1 = host1
+            username2, position2 = host2
+            
+            logger.info(f"Swapping {username1} (position {position1}) with {username2} (position {position2})")
+            
+            # Swap positions
+            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+                         (position2, str(member1.id)))
+            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+                         (position1, str(member2.id)))
+            
+            database.conn.commit()
+            database.close()
+            
+            await ctx.send(f"✅ Swapped positions of {username1} and {username2}!")
+            logger.info(f"✅ Swapped positions of {username1} and {username2}")
+            
+        except Exception as e:
+            logger.error(f"Error in swap_position command: {e}")
+            database.conn.rollback()
+            database.close()
+            await ctx.send("❌ An error occurred while processing this command.")
+
+    @commands.command()
+    @in_allowed_channel()
+    async def send_to_back(self, ctx, member: discord.Member):
+        """Send a user to the back of the hosting rotation."""
+        logger.info(f"🔄 Received command: !send_to_back {member.name}")
+        
+        try:
+            database.connect()
+            cursor = database.cursor
+            
+            # Verify the host exists and is active
+            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
+                           (str(member.id),))
+            host = cursor.fetchone()
+            if not host:
+                await ctx.send(f"❌ {member.name} not found in active rotation.")
+                logger.warning(f"Host {member.name} not found or not active for send_to_back command")
+                database.close()
+                return
+                
+            username, current_position = host
+            
+            # Get the maximum position
+            cursor.execute("SELECT MAX(order_position) FROM hosting_rotation WHERE active=1")
+            max_position = cursor.fetchone()[0]
+            
+            # If already at the back, no need to change
+            if current_position == max_position:
+                await ctx.send(f"ℹ️ {username} is already at the back of the rotation.")
+                database.close()
+                return
+            
+            logger.info(f"Moving {username} from position {current_position} to the back")
+            
+            # Decrement everyone's position who is behind this user
+            cursor.execute("UPDATE hosting_rotation SET order_position = order_position - 1 WHERE order_position > ? AND active=1", 
+                         (current_position,))
+            
+            # Move this user to the back
+            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+                         (max_position, str(member.id)))
+            
+            database.conn.commit()
+            database.close()
+            
+            await ctx.send(f"✅ {username} has been moved to the back of the rotation!")
+            logger.info(f"✅ {username} has been moved to the back of the rotation")
+            
+        except Exception as e:
+            logger.error(f"Error in send_to_back command: {e}")
+            database.conn.rollback()
+            database.close()
+            await ctx.send("❌ An error occurred while processing this command.")
 
 # Required Setup Function for Bot Extensions
 async def setup(bot):
