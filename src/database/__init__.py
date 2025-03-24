@@ -14,7 +14,32 @@ class Database:
     # Core operations
     def create_tables(self) -> None:
         """Initializes all database tables."""
-        self._connection.create_tables()
+        # Don't use context manager here since caller manages connection
+        self._connection.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_data (
+                discord_id INTEGER PRIMARY KEY,
+                bga_id TEXT UNIQUE NOT NULL
+            )
+        """)
+        self._connection.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS game_data (
+                id INTEGER PRIMARY KEY,
+                url TEXT,
+                game_name TEXT,
+                active_player_id INTEGER
+            )
+        """)
+        self._connection.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS hosting_rotation (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                discord_id TEXT UNIQUE NOT NULL,
+                username TEXT NOT NULL,
+                order_position INTEGER NOT NULL,
+                last_hosted DATE,
+                active INTEGER DEFAULT 1
+            )
+        """)
+        self._connection.conn.commit()
 
     # Host operations
     def add_host(self, discord_id: str, username: str) -> bool:

@@ -24,10 +24,6 @@ class BGABot:
     def _setup_database(self) -> None:
         """Initialize database connection."""
         self.config.data_dir.mkdir(parents=True, exist_ok=True)
-
-        # Debug: Write environment marker file
-        env_file = self.config.data_dir / "environment.txt"
-        env_file.write_text(self.config.environment)
         
         # Debug: Log environment setup
         logging.info("🔧 Environment Setup:")
@@ -37,15 +33,12 @@ class BGABot:
         logging.info(f"  • Database Path: {self.config.database_path}")
 
         self.database = Database(self.config.database_path)
-        self.database.create_tables()
         
-        # Verify database setup
-        try:
+        # Create tables and verify connection in a single context
+        with self.database._connection:
+            self.database.create_tables()
             self.database._connection.cursor.execute("SELECT 1")
             logging.info("✅ Database connection verified")
-        except Exception as e:
-            logging.error(f"❌ Database connection failed: {e}")
-            raise
         
     def _setup_bot(self) -> None:
         """Initialize Discord bot."""

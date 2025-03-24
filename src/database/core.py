@@ -22,6 +22,11 @@ class DatabaseConnection:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit that handles commit/rollback."""
+        if exc_type is None:
+            self.conn.commit()
+        else:
+            self.conn.rollback()
         self.close()
 
     def connect(self):
