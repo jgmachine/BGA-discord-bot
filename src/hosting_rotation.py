@@ -39,7 +39,7 @@ class HostingRotationCommands(commands.Cog):
         """Adds a user to the host list"""
         logger.info(f"🔄 Received command: /host_add {member.name} (ID: {member.id})")
 
-        database.addHost(str(member.id), member.name)
+        database.add_host(str(member.id), member.name)
         await interaction.response.send_message(
             f"✅ {member.name} has been added to the host list!"
         )
@@ -76,7 +76,7 @@ class HostingRotationCommands(commands.Cog):
         """Shows who's next in the list"""
         logger.info("🔄 Received command: /host_next")
 
-        host = database.getNextHost()
+        host = database.get_next_host()
         if host:
             await interaction.response.send_message(
                 f"🎲 The next host is: **{host['username']}**"
@@ -206,7 +206,7 @@ class HostingRotationCommands(commands.Cog):
         """Moves the current host to the bottom of the list"""
         logger.info("🔄 Received command: /host_rotate")
 
-        result = database.rotateHosts()
+        result = database.rotate_hosts()
         await interaction.response.send_message("✅ Hosting rotation updated!")
         logger.info(f"✅ Hosting rotation has been updated. {result}")
 
@@ -215,7 +215,7 @@ class HostingRotationCommands(commands.Cog):
         """Displays the current host list order"""
         logger.info("🔄 Received command: /host_list")
 
-        hosts = database.getAllHosts()
+        hosts = database.get_all_hosts()
         
         if hosts:
             embed = discord.Embed(

@@ -23,15 +23,15 @@ class BGACommands(commands.Cog):
 
     @app_commands.command(name="bga_unlink", description="Unlink your Discord account from BGA")
     async def bga_unlink(self, interaction: discord.Interaction):
-        database.deleteUserData(interaction.user.id)
+        database.delete_user_data(interaction.user.id)
         await interaction.response.send_message("BGA account unlinked!")
 
     @app_commands.command(name="bga_untrack", description="Stop tracking a BGA game")
     @app_commands.describe(game_id="The ID of the BGA game to stop tracking")
     async def bga_untrack(self, interaction: discord.Interaction, game_id: str):
         try:
-            game = database.getGameById(game_id)
-            database.deleteGameData(game_id)
+            game = database.get_game_by_id(game_id)
+            database.delete_game_data(game_id)
             await interaction.response.send_message(f"Stopped tracking {game.name} (ID: {game.id})")
         except Exception as e:
             logging.error(f"Error when removing game: {e}")
@@ -44,7 +44,7 @@ class BGACommands(commands.Cog):
             game_id = utils.extractGameId(url)
             game_name, active_player_id = await webscraper.getGameInfo(url)
 
-            database.insertGameData(game_id, url, game_name, active_player_id)
+            database.insert_game_data(game_id, url, game_name, active_player_id)
 
             await interaction.response.send_message(
                 f"Now tracking BGA game: {game_name} (ID: {game_id})"
@@ -61,7 +61,7 @@ class BGACommands(commands.Cog):
     @app_commands.describe(bga_id="Your Board Game Arena username")
     async def bga_link(self, interaction: discord.Interaction, bga_id: str):
         try:
-            database.insertUserData(discordId=interaction.user.id, bgaId=bga_id)
+            database.insert_user_data(discordId=interaction.user.id, bgaId=bga_id)
             await interaction.response.send_message(f"Successfully linked to BGA account: {bga_id}")
         except sqlite3.IntegrityError as e:
             logging.error(f"Error when linking BGA account: {e}")

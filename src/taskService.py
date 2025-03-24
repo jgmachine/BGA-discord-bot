@@ -20,13 +20,13 @@ database = Database(DB_PATH)
 async def processGame(bot, game):
     logging.info(f"Fetching active player for game: {game.name} with id: {game.id}")
     activePlayerId = await webscraper.fetchActivePlayer(game.url)
-    previousActivePlayerId = database.getActivePlayer(game.id)
+    previousActivePlayerId = database.get_active_player(game.id)
     logging.info(f"Active player id: {activePlayerId}")
     if activePlayerId == None:
         logging.info("No active player id found. Checking if the game has ended")
         if await webscraper.checkIfGameEnded(game.url):
             logging.info("Game results list found, removing game from monitoring")
-            database.deleteGameData(game.id)
+            database.delete_game_data(game.id)
         else:
             logging.info("Game results list not found. Keep monitoring game..")
 
@@ -37,14 +37,14 @@ async def processGame(bot, game):
         logging.info(
             f"New active player in game: {game.id} New player: {activePlayerId} Previous active player: {previousActivePlayerId}"
         )
-        database.updateActivePlayer(game.id, activePlayerId)
+        database.update_active_player(game.id, activePlayerId)
         await bga_commands.notify_turn(bot, activePlayerId, game.id)  # Updated to use bga_commands
 
 
 # Task for fetching active player ids and update database if active player changed
 @tasks.loop(minutes=1)
 async def processGames(bot):
-    games = database.getAllGames()
+    games = database.get_all_games()
     logging.info(f"Games: {games}")
 
     for game in games:
