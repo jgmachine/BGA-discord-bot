@@ -24,9 +24,28 @@ class BGABot:
     def _setup_database(self) -> None:
         """Initialize database connection."""
         self.config.data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Debug: Write environment marker file
+        env_file = self.config.data_dir / "environment.txt"
+        env_file.write_text(self.config.environment)
+        
+        # Debug: Log environment setup
+        logging.info("🔧 Environment Setup:")
+        logging.info(f"  • Environment: {self.config.environment}")
+        logging.info(f"  • Production Mode: {self.config.is_production}")
+        logging.info(f"  • Data Directory: {self.config.data_dir}")
+        logging.info(f"  • Database Path: {self.config.database_path}")
+
         self.database = Database(self.config.database_path)
-        self.database.create_tables()  # Changed from createTables to create_tables
-        logging.info(f"✅ Database initialized at {self.config.database_path}")
+        self.database.create_tables()
+        
+        # Verify database setup
+        try:
+            self.database._connection.cursor.execute("SELECT 1")
+            logging.info("✅ Database connection verified")
+        except Exception as e:
+            logging.error(f"❌ Database connection failed: {e}")
+            raise
         
     def _setup_bot(self) -> None:
         """Initialize Discord bot."""

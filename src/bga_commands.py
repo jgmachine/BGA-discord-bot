@@ -84,6 +84,25 @@ class BGACommands(commands.Cog):
             await interaction.response.send_message(f"Database error: {e}")
             logging.error(f"Database error: {e}")
 
+    @app_commands.command(name="bga_debug", description="Show environment debug info (admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def bga_debug(self, interaction: discord.Interaction):
+        try:
+            env_info = [
+                f"🌍 Environment: {os.getenv('RAILWAY_ENVIRONMENT', 'unknown')}",
+                f"📂 Data Path: {DB_PATH}",
+                f"📁 Files in /data: {list(Path('/data').glob('*'))}"
+            ]
+            await interaction.response.send_message(
+                "Debug Info:\n" + "\n".join(env_info),
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.response.send_message(
+                f"Debug error: {e}",
+                ephemeral=True
+            )
+
 async def notify_turn(bot, bga_id, game_id):
     """Notify a user that it's their turn in a BGA game."""
     logging.info(f"Notifying turn for BGA game {game_id}, player {bga_id}")
