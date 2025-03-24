@@ -38,7 +38,7 @@ class BGABot:
         """Load bot command extensions."""
         try:
             await self.bot.load_extension("src.hosting_rotation")
-            await self.bot.load_extension("src.messageController")  # Add this line
+            await self.bot.load_extension("src.bga_commands")  # Updated to new module name
             logging.info("✅ Extensions loaded successfully.")
         except Exception as e:
             logging.error(f"❌ Failed to load extensions: {e}")
