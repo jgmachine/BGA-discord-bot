@@ -16,8 +16,8 @@ def host_command():
     """Combined decorator for host commands."""
     def decorator(func):
         return app_commands.command()(
-            app_commands.guild_only()(
-                app_commands.check(lambda i: i.channel_id == HOSTING_ROTATION_CHANNEL_ID)(
+            app_commands.default_permissions(administrator=True)(  # Make commands admin-only by default
+                app_commands.guild_only()(
                     func
                 )
             )
