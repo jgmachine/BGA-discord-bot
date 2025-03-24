@@ -1,8 +1,11 @@
 import logging
 from pathlib import Path
+import sqlite3
+from discord.ext import commands
+from discord import app_commands
+import discord
 from . import webscraper
 from src.database import Database
-import sqlite3
 from . import utils
 import os
 from dotenv import load_dotenv
@@ -11,77 +14,61 @@ from dotenv import load_dotenv
 DB_PATH = Path("/data/database.db")
 database = Database(DB_PATH)
 load_dotenv()
-NOTIFY_CHANNEL_ID = int(os.getenv("NOTIFY_CHANNEL_ID", "0"))  # Ensure it's an integer
+NOTIFY_CHANNEL_ID = int(os.getenv("NOTIFY_CHANNEL_ID", "0"))
 
-async def handleCommand(bot, message):
-    command = message.content.lower()
+class GameManagementCommands(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-    # Remove the hello command since it's handled by Discord.py commands
-    if command.startswith("!remove_me"):
-        database.deleteUserData(message.author.id)
-        await message.channel.send("User deleted!")
+    @app_commands.command(name="remove_me", description="Remove yourself from the user list")
+    async def remove_me(self, interaction: discord.Interaction):
+        database.deleteUserData(interaction.user.id)
+        await interaction.response.send_message("User deleted!")
 
-    if command.startswith("!remove_game"):
+    @app_commands.command(name="remove_game", description="Stop monitoring a game")
+    @app_commands.describe(game_id="The ID of the game to stop monitoring")
+    async def remove_game(self, interaction: discord.Interaction, game_id: str):
         try:
-            _, gameId = command.split(" ", 1)
-        except Exception:
-            await message.channel.send("Provide a game ID to be removed")
-            return
-
-        try:
-            game = database.getGameById(gameId)
-            database.deleteGameData(gameId)
-
-            await message.channel.send(f"Not monitoring {game.name} with id: {game.id}")
-
+            game = database.getGameById(game_id)
+            database.deleteGameData(game_id)
+            await interaction.response.send_message(f"Not monitoring {game.name} with id: {game.id}")
         except Exception as e:
             logging.error(f"Error when removing game: {e}")
-            await message.channel.send(f"Could not remove game with id: {gameId}")
+            await interaction.response.send_message(f"Could not remove game with id: {game_id}")
 
-    elif command.startswith("!monitor"):
+    @app_commands.command(name="monitor", description="Start monitoring a BGA game")
+    @app_commands.describe(url="The URL of the Board Game Arena table")
+    async def monitor(self, interaction: discord.Interaction, url: str):
         try:
-            _, urlParameter = command.split(" ", 1)
-        except Exception:
-            await message.channel.send("Provide a URL to a board game arena table")
-            return
+            game_id = utils.extractGameId(url)
+            game_name, active_player_id = await webscraper.getGameInfo(url)
 
-        try:
-            gameId = utils.extractGameId(urlParameter)
-            gameName, activePlayerId = await webscraper.getGameInfo(urlParameter)
+            database.insertGameData(game_id, url, game_name, active_player_id)
 
-            database.insertGameData(gameId, urlParameter, gameName, activePlayerId)
-
-            await message.channel.send(
-                f"Monitoring {gameName} with id: {gameId} at url: {urlParameter}"
+            await interaction.response.send_message(
+                f"Monitoring {game_name} with id: {game_id} at url: {url}"
             )
-            await notifyer(bot, activePlayerId, gameId)
+            await notifyer(self.bot, active_player_id, game_id)
 
         except Exception as e:
             logging.error(f"Error when monitoring: {e}")
-            await message.channel.send(
-                f"Something went wrong when trying to monitor game with url: {urlParameter}"
+            await interaction.response.send_message(
+                f"Something went wrong when trying to monitor game with url: {url}"
             )
 
-    elif command.startswith("!add_user"):
+    @app_commands.command(name="add_user", description="Link your Discord account to your BGA ID")
+    @app_commands.describe(bga_id="Your Board Game Arena user ID")
+    async def add_user(self, interaction: discord.Interaction, bga_id: str):
         try:
-            _, bgaId = command.split(" ", 1)
-        except Exception:
-            await message.channel.send("Provide a BGA user ID")
-            return
-
-        discordId = message.author.id
-
-        try:
-            database.insertUserData(discordId=discordId, bgaId=bgaId)
-            await message.channel.send("User added!")
+            database.insertUserData(discordId=interaction.user.id, bgaId=bga_id)
+            await interaction.response.send_message("User added!")
         except sqlite3.IntegrityError as e:
             logging.error(f"Error when adding user: {e}")
-            await message.channel.send("Discord user ID already added!")
+            await interaction.response.send_message("Discord user ID already added!")
 
-    # Updated !debug_users to use the persistent database path
-    elif command.startswith("!debug_users"):
+    @app_commands.command(name="debug_users", description="Show all stored users (debug)")
+    async def debug_users(self, interaction: discord.Interaction):
         try:
-            # Use the same DB_PATH for consistency
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM user_data")
@@ -89,13 +76,12 @@ async def handleCommand(bot, message):
             conn.close()
 
             if rows:
-                await message.channel.send(f"Stored Users: {rows}")
+                await interaction.response.send_message(f"Stored Users: {rows}")
             else:
-                await message.channel.send("No users found in the database.")
+                await interaction.response.send_message("No users found in the database.")
         except Exception as e:
-            await message.channel.send(f"Error accessing database: {e}")
+            await interaction.response.send_message(f"Error accessing database: {e}")
             logging.error(f"Database error: {e}")
-
 
 async def notifyer(bot, bgaId, gameId):
     logging.info(f"notifyer() triggered for game {gameId} and player {bgaId}")
@@ -118,3 +104,7 @@ async def notifyer(bot, bgaId, gameId):
             logging.info("Message sent successfully.")
         except Exception as e:
             logging.error(f"Failed to send message: {e}")
+async def setup(bot):
+    await bot.add_cog(GameManagementCommands(bot))
+    await bot.tree.sync()
+    logging.info("✅ GameManagementCommands cog has been loaded and commands synced.")
