@@ -21,6 +21,10 @@ def in_allowed_channel():
         return True
     return app_commands.check(predicate)
 
+def command_visible_in_channel(interaction: discord.Interaction) -> bool:
+    """Determine if commands should be visible in the current channel."""
+    return interaction.channel_id == HOSTING_ROTATION_CHANNEL_ID
+
 # Create a Database Instance
 DB_DIR = Path("/data")
 DB_PATH = DB_DIR / "database.db"
@@ -32,8 +36,9 @@ class HostingRotationCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="host_add", description="Adds a user to the host list")
+    @app_commands.command(name="host_add", description="Adds a user to the host list", guild_only=True)
     @app_commands.describe(member="The user to add to the host list")
+    @app_commands.check(command_visible_in_channel)
     @in_allowed_channel()
     async def add_host(self, interaction: discord.Interaction, member: discord.Member):
         logger.info(f"🔄 Received command: /host_add {member.name} (ID: {member.id})")
@@ -44,8 +49,9 @@ class HostingRotationCommands(commands.Cog):
         )
         logger.info(f"✅ Successfully added {member.name} (ID: {member.id}) to the host list.")
 
-    @app_commands.command(name="host_remove", description="Removes a user from the host list")
+    @app_commands.command(name="host_remove", description="Removes a user from the host list", guild_only=True)
     @app_commands.describe(member="The user to remove from the host list")
+    @app_commands.check(command_visible_in_channel)
     @in_allowed_channel()
     async def remove_host(self, interaction: discord.Interaction, member: discord.Member):
         logger.info(f"🔄 Received command: /host_remove {member.name}")
@@ -70,7 +76,8 @@ class HostingRotationCommands(commands.Cog):
         finally:
             database.close()
 
-    @app_commands.command(name="host_next", description="Shows who's next in the list")
+    @app_commands.command(name="host_next", description="Shows who's next in the list", guild_only=True)
+    @app_commands.check(command_visible_in_channel)
     @in_allowed_channel()
     async def next_host(self, interaction: discord.Interaction):
         logger.info("🔄 Received command: /host_next")
@@ -85,7 +92,8 @@ class HostingRotationCommands(commands.Cog):
             await interaction.response.send_message("❌ No active hosts found.")
             logger.warning("⚠️ No active hosts found.")
 
-    @app_commands.command(name="host_move", description="Move a host to a specific position")
+    @app_commands.command(name="host_move", description="Move a host to a specific position", guild_only=True)
+    @app_commands.check(command_visible_in_channel)
     @app_commands.describe(
         member="The user to move",
         position="Where to move them (top/bottom/next)",
@@ -148,7 +156,8 @@ class HostingRotationCommands(commands.Cog):
         finally:
             database.close()
 
-    @app_commands.command(name="host_swap", description="Swap the positions of two hosts")
+    @app_commands.command(name="host_swap", description="Swap the positions of two hosts", guild_only=True)
+    @app_commands.check(command_visible_in_channel)
     @app_commands.describe(first="First host", second="Second host")
     @in_allowed_channel()
     async def swap_hosts(self, interaction: discord.Interaction, first: discord.Member, second: discord.Member):
@@ -200,7 +209,8 @@ class HostingRotationCommands(commands.Cog):
             database.close()
             await interaction.response.send_message("❌ An error occurred while processing this command.")
 
-    @app_commands.command(name="host_rotate", description="Moves the current host to the bottom of the list")
+    @app_commands.command(name="host_rotate", description="Moves the current host to the bottom of the list", guild_only=True)
+    @app_commands.check(command_visible_in_channel)
     @in_allowed_channel()
     async def rotate(self, interaction: discord.Interaction):
         logger.info("🔄 Received command: /host_rotate")
@@ -209,7 +219,8 @@ class HostingRotationCommands(commands.Cog):
         await interaction.response.send_message("✅ Hosting rotation updated!")
         logger.info(f"✅ Hosting rotation has been updated. {result}")
 
-    @app_commands.command(name="host_list", description="Displays the current host list order")
+    @app_commands.command(name="host_list", description="Displays the current host list order", guild_only=True)
+    @app_commands.check(command_visible_in_channel)
     @in_allowed_channel()
     async def host_list(self, interaction: discord.Interaction):
         logger.info("🔄 Received command: /host_list")
@@ -229,7 +240,8 @@ class HostingRotationCommands(commands.Cog):
             await interaction.response.send_message("❌ No active hosts found.")
             logger.warning("⚠️ No active hosts found for host list.")
 
-    @app_commands.command(name="host_help", description="Shows help information for all host commands")
+    @app_commands.command(name="host_help", description="Shows help information for all host commands", guild_only=True)
+    @app_commands.check(command_visible_in_channel)
     @in_allowed_channel()
     async def host_help(self, interaction: discord.Interaction):
         """Displays help information for all hosting commands."""
