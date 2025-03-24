@@ -25,7 +25,7 @@ class BGABot:
         """Initialize database connection."""
         self.config.data_dir.mkdir(parents=True, exist_ok=True)
         self.database = Database(self.config.database_path)
-        self.database.createTables()
+        self.database.create_tables()  # Changed from createTables to create_tables
         logging.info(f"✅ Database initialized at {self.config.database_path}")
         
     def _setup_bot(self) -> None:
