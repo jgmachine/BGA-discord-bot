@@ -227,7 +227,7 @@ class HostingRotationCommands(commands.Cog):
                 embed.add_field(
                     name=f"{host['position']}. {host['username']}", 
                     value="\u200b",  # Zero-width space as value
-                    inline=False
+                    inline=True
                 )
             
             await interaction.response.send_message(embed=embed)
