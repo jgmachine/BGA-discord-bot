@@ -38,8 +38,10 @@ class BGABot:
         """Load bot command extensions."""
         try:
             await self.bot.load_extension("src.hosting_rotation")
-            await self.bot.load_extension("src.bga_commands")  # Updated to new module name
-            logging.info("✅ Extensions loaded successfully.")
+            await self.bot.load_extension("src.bga_commands")
+            # Sync commands globally after loading extensions
+            await self.bot.tree.sync()
+            logging.info("✅ Extensions loaded and commands synced successfully.")
         except Exception as e:
             logging.error(f"❌ Failed to load extensions: {e}")
             
@@ -51,6 +53,7 @@ class BGABot:
         @self.bot.event
         async def on_ready():
             logging.info(f"✅ Logged in as {self.bot.user}")
+            # Load extensions and sync commands when bot is ready
             await self._load_extensions()
             taskService.processGames.start(self.bot)
             
