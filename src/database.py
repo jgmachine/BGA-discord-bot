@@ -33,6 +33,15 @@ class Database:
         self.conn = None
         self.cursor = None
 
+    def __enter__(self):
+        """Context manager entry."""
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.close()
+
         # Log the database path for debugging
         logging.info(f"[DATABASE] Initialized at: {self.db_file}")
 
@@ -341,22 +350,21 @@ class Database:
         """Returns all active hosts in their current rotation order."""
         host_logger.info("Fetching all hosts in rotation order")
         try:
-            self.connect()
-            cursor = self.cursor
-            
-            # Ensure there are no gaps in positions before fetching
-            self._resequencePositions()
-            
-            cursor.execute("SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC")
-            hosts = cursor.fetchall()
-            self.close()
-            
-            if hosts:
-                host_logger.info(f"Retrieved {len(hosts)} hosts in rotation order")
-                return [{"discord_id": host[0], "username": host[1], "position": host[2]} for host in hosts]
-            else:
-                host_logger.warning("No active hosts found in rotation")
-                return []
+            with self:  # This will auto-close the connection
+                cursor = self.cursor
+                
+                # Ensure there are no gaps in positions before fetching
+                self._resequencePositions()
+                
+                cursor.execute("SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC")
+                hosts = cursor.fetchall()
+                
+                if hosts:
+                    host_logger.info(f"Retrieved {len(hosts)} hosts in rotation order")
+                    return [{"discord_id": host[0], "username": host[1], "position": host[2]} for host in hosts]
+                else:
+                    host_logger.warning("No active hosts found in rotation")
+                    return []
         except Exception as e:
             host_logger.error(f"Error fetching all hosts: {e}")
             self.close()
