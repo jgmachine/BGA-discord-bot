@@ -225,15 +225,16 @@ class HostingRotationCommands(commands.Cog):
             
             for host in hosts:
                 embed.add_field(
-                    name=f"{host['position']}. {host['username']}",
+                    name=f"{host['position']}. {host['username']}", 
+                    value="\u200b",  # Zero-width space as value
                     inline=False
                 )
             
             await interaction.response.send_message(embed=embed)
-            logger.info(f"✅ Displayed rotation list with {len(hosts)} hosts")
+            logger.info(f"✅ Displayed host list with {len(hosts)} hosts")
         else:
-            await interaction.response.send_message("❌ No active hosts found in the rotation.")
-            logger.warning("⚠️ No active hosts found for rotation list.")
+            await interaction.response.send_message("❌ No active hosts found.")
+            logger.warning("⚠️ No active hosts found for host list.")
 
     @app_commands.command(name="hosthelp", description="Shows help information for all host commands")
     @in_allowed_channel()
