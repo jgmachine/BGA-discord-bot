@@ -16,9 +16,7 @@ NOTIFY_CHANNEL_ID = int(os.getenv("NOTIFY_CHANNEL_ID", "0"))  # Ensure it's an i
 async def handleCommand(bot, message):
     command = message.content.lower()
 
-    if command.startswith("!hello"):
-        await message.channel.send("hello!")
-
+    # Remove the hello command since it's handled by Discord.py commands
     if command.startswith("!remove_me"):
         database.deleteUserData(message.author.id)
         await message.channel.send("User deleted!")
