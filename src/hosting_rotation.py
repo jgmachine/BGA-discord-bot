@@ -219,16 +219,9 @@ class HostingRotationCommands(commands.Cog):
         if hosts:
             embed = discord.Embed(
                 title="🎲 Current Hosting Rotation",
-                description="The current order of game hosts:",
+                description="\n".join([f"{host['position']}. {host['username']}" for host in hosts]),
                 color=discord.Color.blue()
             )
-            
-            for host in hosts:
-                embed.add_field(
-                    name=f"{host['position']}. {host['username']}", 
-                    value="\u200b",  # Zero-width space as value
-                    inline=True
-                )
             
             await interaction.response.send_message(embed=embed)
             logger.info(f"✅ Displayed host list with {len(hosts)} hosts")
