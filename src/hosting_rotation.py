@@ -16,10 +16,8 @@ def host_command():
     """Combined decorator for host commands."""
     def decorator(func):
         return app_commands.command()(
-            app_commands.default_permissions(administrator=True)(  # Make commands admin-only by default
-                app_commands.guild_only()(
-                    func
-                )
+            app_commands.guild_only()(  # Keep guild_only
+                func  # Remove default_permissions(administrator=True) to allow visibility based on Discord's integration settings
             )
         )
     return decorator
