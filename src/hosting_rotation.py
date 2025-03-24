@@ -32,11 +32,11 @@ class HostingRotationCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="addhost", description="Adds a user to the host list")
+    @app_commands.command(name="host_add", description="Adds a user to the host list")
     @app_commands.describe(member="The user to add to the host list")
     @in_allowed_channel()
     async def add_host(self, interaction: discord.Interaction, member: discord.Member):
-        logger.info(f"🔄 Received command: /addhost {member.name} (ID: {member.id})")
+        logger.info(f"🔄 Received command: /host_add {member.name} (ID: {member.id})")
 
         database.addHost(str(member.id), member.name)
         await interaction.response.send_message(
@@ -44,11 +44,11 @@ class HostingRotationCommands(commands.Cog):
         )
         logger.info(f"✅ Successfully added {member.name} (ID: {member.id}) to the host list.")
 
-    @app_commands.command(name="removehost", description="Removes a user from the host list")
+    @app_commands.command(name="host_remove", description="Removes a user from the host list")
     @app_commands.describe(member="The user to remove from the host list")
     @in_allowed_channel()
     async def remove_host(self, interaction: discord.Interaction, member: discord.Member):
-        logger.info(f"🔄 Received command: /removehost {member.name}")
+        logger.info(f"🔄 Received command: /host_remove {member.name}")
 
         try:
             database.connect()
@@ -70,10 +70,10 @@ class HostingRotationCommands(commands.Cog):
         finally:
             database.close()
 
-    @app_commands.command(name="nexthost", description="Shows who's next in the list")
+    @app_commands.command(name="host_next", description="Shows who's next in the list")
     @in_allowed_channel()
     async def next_host(self, interaction: discord.Interaction):
-        logger.info("🔄 Received command: /nexthost")
+        logger.info("🔄 Received command: /host_next")
 
         host = database.getNextHost()
         if host:
@@ -85,7 +85,7 @@ class HostingRotationCommands(commands.Cog):
             await interaction.response.send_message("❌ No active hosts found.")
             logger.warning("⚠️ No active hosts found.")
 
-    @app_commands.command(name="movehost", description="Move a host to a specific position")
+    @app_commands.command(name="host_move", description="Move a host to a specific position")
     @app_commands.describe(
         member="The user to move",
         position="Where to move them (top/bottom/next)",
@@ -97,7 +97,7 @@ class HostingRotationCommands(commands.Cog):
     ])
     @in_allowed_channel()
     async def move_host(self, interaction: discord.Interaction, member: discord.Member, position: app_commands.Choice[str]):
-        logger.info(f"🔄 Received command: /movehost {member.name} to {position.value}")
+        logger.info(f"🔄 Received command: /host_move {member.name} to {position.value}")
         
         try:
             database.connect()
@@ -148,11 +148,11 @@ class HostingRotationCommands(commands.Cog):
         finally:
             database.close()
 
-    @app_commands.command(name="swaphosts", description="Swap the positions of two hosts")
+    @app_commands.command(name="host_swap", description="Swap the positions of two hosts")
     @app_commands.describe(first="First host", second="Second host")
     @in_allowed_channel()
     async def swap_hosts(self, interaction: discord.Interaction, first: discord.Member, second: discord.Member):
-        logger.info(f"🔄 Received command: /swaphosts {first.name} {second.name}")
+        logger.info(f"🔄 Received command: /host_swap {first.name} {second.name}")
         
         try:
             database.connect()
@@ -200,19 +200,19 @@ class HostingRotationCommands(commands.Cog):
             database.close()
             await interaction.response.send_message("❌ An error occurred while processing this command.")
 
-    @app_commands.command(name="rotate", description="Moves the current host to the bottom of the list")
+    @app_commands.command(name="host_rotate", description="Moves the current host to the bottom of the list")
     @in_allowed_channel()
     async def rotate(self, interaction: discord.Interaction):
-        logger.info("🔄 Received command: /rotate")
+        logger.info("🔄 Received command: /host_rotate")
 
         result = database.rotateHosts()
         await interaction.response.send_message("✅ Hosting rotation updated!")
         logger.info(f"✅ Hosting rotation has been updated. {result}")
 
-    @app_commands.command(name="hostlist", description="Displays the current host list order")
+    @app_commands.command(name="host_list", description="Displays the current host list order")
     @in_allowed_channel()
     async def host_list(self, interaction: discord.Interaction):
-        logger.info("🔄 Received command: /hostlist")
+        logger.info("🔄 Received command: /host_list")
 
         hosts = database.getAllHosts()
         
@@ -229,11 +229,11 @@ class HostingRotationCommands(commands.Cog):
             await interaction.response.send_message("❌ No active hosts found.")
             logger.warning("⚠️ No active hosts found for host list.")
 
-    @app_commands.command(name="hosthelp", description="Shows help information for all host commands")
+    @app_commands.command(name="host_help", description="Shows help information for all host commands")
     @in_allowed_channel()
     async def host_help(self, interaction: discord.Interaction):
         """Displays help information for all hosting commands."""
-        logger.info("🔄 Received command: /hosthelp")
+        logger.info("🔄 Received command: /host_help")
         
         embed = discord.Embed(
             title="🎲 Host List Commands",
@@ -244,8 +244,8 @@ class HostingRotationCommands(commands.Cog):
         embed.add_field(
             name="📋 View Commands",
             value=(
-                "**/nexthost** - Shows who's next in the list\n"
-                "**/hostlist** - Displays the complete host order"
+                "**/host_next** - Shows who's next in the list\n"
+                "**/host_list** - Displays the complete host order"
             ),
             inline=False
         )
@@ -253,9 +253,9 @@ class HostingRotationCommands(commands.Cog):
         embed.add_field(
             name="🔄 List Management",
             value=(
-                "**/rotate** - Moves current host to the bottom\n"
-                "**/movehost @user [top/bottom/next]** - Move a host to a specific position\n"
-                "**/swaphosts @user1 @user2** - Swaps the positions of two hosts"
+                "**/host_rotate** - Moves current host to the bottom\n"
+                "**/host_move @user [top/bottom/next]** - Move a host to a specific position\n"
+                "**/host_swap @user1 @user2** - Swaps the positions of two hosts"
             ),
             inline=False
         )
@@ -263,8 +263,8 @@ class HostingRotationCommands(commands.Cog):
         embed.add_field(
             name="👤 User Management",
             value=(
-                "**/addhost @user** - Adds a new user to the list\n"
-                "**/removehost @user** - Removes a user from the list"
+                "**/host_add @user** - Adds a new user to the list\n"
+                "**/host_remove @user** - Removes a user from the list"
             ),
             inline=False
         )
