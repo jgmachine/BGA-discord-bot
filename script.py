@@ -33,12 +33,16 @@ class BGABot:
         logging.info(f"  • Database Path: {self.config.database_path}")
 
         self.database = Database(self.config.database_path)
+        self.database._connection.ensure_connected()
+        self.database.create_tables()
         
-        # Create tables and verify connection in a single context
-        with self.database._connection:
-            self.database.create_tables()
+        # Verify connection
+        try:
             self.database._connection.cursor.execute("SELECT 1")
             logging.info("✅ Database connection verified")
+        except Exception as e:
+            logging.error(f"❌ Database connection failed: {e}")
+            raise
         
     def _setup_bot(self) -> None:
         """Initialize Discord bot."""

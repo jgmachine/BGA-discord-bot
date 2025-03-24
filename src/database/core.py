@@ -14,11 +14,11 @@ class DatabaseConnection:
     
     def __init__(self, db_file):
         self.db_file = db_file
-        self.conn = None
-        self.cursor = None
+        self.connect()  # Establish connection on init
 
     def __enter__(self):
-        self.connect()
+        if not self.conn:
+            self.connect()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -27,7 +27,8 @@ class DatabaseConnection:
             self.conn.commit()
         else:
             self.conn.rollback()
-        self.close()
+            logging.error(f"Database error: {exc_val}")
+        # Don't close connection here, keep it open for the bot lifetime
 
     def connect(self):
         """Establishes database connection."""
@@ -39,7 +40,14 @@ class DatabaseConnection:
         """Closes database connection."""
         if self.conn:
             self.conn.close()
+            self.conn = None
+            self.cursor = None
             logging.info("[DATABASE] Connection closed.")
+
+    def ensure_connected(self):
+        """Ensures database is connected."""
+        if not self.conn:
+            self.connect()
 
     def create_tables(self):
         """Creates all required tables."""
