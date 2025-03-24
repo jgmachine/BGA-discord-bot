@@ -38,34 +38,32 @@ class DatabaseConnection:
 
     def create_tables(self):
         """Creates all required tables."""
-        self.connect()
-        # Create user_data table
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_data (
-                discord_id INTEGER PRIMARY KEY,
-                bga_id TEXT UNIQUE NOT NULL
-            )
-        """)
-        # Create game_data table
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS game_data (
-                id INTEGER PRIMARY KEY,
-                url TEXT,
-                game_name TEXT,
-                active_player_id INTEGER
-            )
-        """)
-        # Create hosting_rotation table
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS hosting_rotation (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                discord_id TEXT UNIQUE NOT NULL,
-                username TEXT NOT NULL,
-                order_position INTEGER NOT NULL,
-                last_hosted DATE,
-                active INTEGER DEFAULT 1
-            )
-        """)
-        self.conn.commit()
-        self.close()
-        logging.info("[DATABASE] Tables checked/created successfully.")
+        with self:
+            # Create user_data table
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_data (
+                    discord_id INTEGER PRIMARY KEY,
+                    bga_id TEXT UNIQUE NOT NULL
+                )
+            """)
+            # Create game_data table
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS game_data (
+                    id INTEGER PRIMARY KEY,
+                    url TEXT,
+                    game_name TEXT,
+                    active_player_id INTEGER
+                )
+            """)
+            # Create hosting_rotation table
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS hosting_rotation (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    discord_id TEXT UNIQUE NOT NULL,
+                    username TEXT NOT NULL,
+                    order_position INTEGER NOT NULL,
+                    last_hosted DATE,
+                    active INTEGER DEFAULT 1
+                )
+            """)
+            self.conn.commit()
