@@ -62,3 +62,11 @@ spec:
 # then execute:
 kubectl apply -f k8s-manifests.yaml
 ```
+
+## Command Setup
+After adding the bot, server administrators need to:
+1. Go to Server Settings -> Integrations
+2. Find the bot and click "Manage"
+3. Under "Command Permissions":
+   - Set the channel restrictions for host commands to only allow them in your designated hosting channel
+   - Optionally adjust role permissions if you want non-admin users to use the commands

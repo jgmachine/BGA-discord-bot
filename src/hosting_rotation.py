@@ -1,5 +1,6 @@
 import os
 import discord
+from discord import app_commands
 from discord.ext import commands
 import logging
 from pathlib import Path
@@ -8,205 +9,172 @@ from src.database import Database
 # Setup Logging for Commands
 logger = logging.getLogger(__name__)
 
-# Define Allowed Channel for Commands (Replace with your actual channel ID)
+# Define Allowed Channel for Commands
 HOSTING_ROTATION_CHANNEL_ID = int(os.getenv("HOSTING_ROTATION_CHANNEL_ID", "0"))
 
-def in_allowed_channel():
-    """Decorator to restrict commands to a specific channel."""
-    async def predicate(ctx):
-        return ctx.channel.id == HOSTING_ROTATION_CHANNEL_ID
-    return commands.check(predicate)
+def host_command():
+    """Combined decorator for host commands."""
+    def decorator(func):
+        return app_commands.command()(
+            app_commands.guild_only()(  # Keep guild_only
+                func  # Remove default_permissions(administrator=True) to allow visibility based on Discord's integration settings
+            )
+        )
+    return decorator
 
-# Create a Database Instance - Use the DB_PATH from database.py correctly
+# Create a Database Instance
 DB_DIR = Path("/data")
 DB_PATH = DB_DIR / "database.db"
-database = Database(DB_PATH)  # Use the database class with proper path
+database = Database(DB_PATH)
 
 class HostingRotationCommands(commands.Cog):
-    """Commands for managing the hosting rotation."""
+    """Commands for managing the game hosts."""
 
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command()
-    @in_allowed_channel()
-    async def add_host(self, ctx, member: discord.Member):
-        """Adds a user to the hosting rotation."""
-        logger.info(f"🔄 Received command: !add_host {member.name} (ID: {member.id})")
+    @host_command()
+    @app_commands.describe(member="The user to add to the host list")
+    async def host_add(self, interaction: discord.Interaction, member: discord.Member):
+        """Adds a user to the host list"""
+        logger.info(f"🔄 Received command: /host_add {member.name} (ID: {member.id})")
 
-        # Fix: Use camelCase function name to match database.py implementation
         database.addHost(str(member.id), member.name)
-        await ctx.send(f"✅ {member.name} has been added to the hosting rotation!")
+        await interaction.response.send_message(
+            f"✅ {member.name} has been added to the host list!"
+        )
+        logger.info(f"✅ Successfully added {member.name} (ID: {member.id}) to the host list.")
 
-        # Log confirmation
-        logger.info(f"✅ Successfully added {member.name} (ID: {member.id}) to the hosting rotation.")
-
-    @commands.command()
-    @in_allowed_channel()
-    async def next_host(self, ctx):
-        """Displays the next host in the rotation."""
-        logger.info("🔄 Received command: !next_host")
-
-        # Fix: Use camelCase function name to match database.py implementation
-        host = database.getNextHost()
-        if host:
-            await ctx.send(f"🎲 The next host is: **{host['username']}**")
-            logger.info(f"✅ Next host: {host['username']}")
-        else:
-            await ctx.send("❌ No active hosts found.")
-            logger.warning("⚠️ No active hosts found.")
-
-    @commands.command()
-    @in_allowed_channel()
-    async def rotate_hosts(self, ctx):
-        """Moves the current host to the back of the queue."""
-        logger.info("🔄 Received command: !rotate_hosts")
-
-        # Fix: Use camelCase function name to match database.py implementation
-        result = database.rotateHosts()
-        await ctx.send("✅ Hosting rotation updated!")
-        logger.info(f"✅ Hosting rotation has been updated. {result}")
-
-    @commands.command()
-    @in_allowed_channel()
-    async def defer_host(self, ctx, member: discord.Member):
-        """Allows a user to defer their hosting turn."""
-        logger.info(f"🔄 Received command: !defer_host {member.name}")
-
-        # Fix: Use camelCase function name to match database.py implementation
-        result = database.deferHost(str(member.id))
-        await ctx.send(f"✅ {member.name} has deferred their turn.")
-        logger.info(f"✅ {member.name} has deferred their hosting turn. {result}")
-
-    @commands.command()
-    @in_allowed_channel()
-    async def snooze_host(self, ctx, member: discord.Member):
-        """Temporarily removes a user from the hosting rotation."""
-        logger.info(f"🔄 Received command: !snooze_host {member.name}")
-
-        # Fix: Use camelCase function name to match database.py implementation
-        result = database.snoozeHost(str(member.id))
-        await ctx.send(f"😴 {member.name} has been snoozed.")
-        logger.info(f"✅ {member.name} has been snoozed. {result}")
-    
-    @commands.command()
-    @in_allowed_channel()
-    async def activate_host(self, ctx, member: discord.Member):
-        """Reactivates a snoozed user in the hosting rotation."""
-        logger.info(f"🔄 Received command: !activate_host {member.name}")
-
-        # Fix: Use camelCase function name to match database.py implementation
-        result = database.activateHost(str(member.id))
-        await ctx.send(f"🔔 {member.name} has been reactivated in the rotation.")
-        logger.info(f"✅ {member.name} has been reactivated. {result}")
-
-    @commands.command()
-    @in_allowed_channel()
-    async def rotation_list(self, ctx):
-        """Displays the current hosting rotation order."""
-        logger.info("🔄 Received command: !rotation_list")
-
-        # Get all hosts in rotation order
-        hosts = database.getAllHosts()
-        
-        if hosts:
-            # Create an embedded message for nicer formatting
-            embed = discord.Embed(
-                title="🎲 Current Hosting Rotation",
-                description="The current order of game hosts:",
-                color=discord.Color.blue()
-            )
-            
-            # Add hosts to the embed
-            for host in hosts:
-                embed.add_field(
-                    name=f"{host['position']}. {host['username']}", 
-                    value=f"Position: {host['position']}", 
-                    inline=False
-                )
-            
-            await ctx.send(embed=embed)
-            logger.info(f"✅ Displayed rotation list with {len(hosts)} hosts")
-        else:
-            await ctx.send("❌ No active hosts found in the rotation.")
-            logger.warning("⚠️ No active hosts found for rotation list.")
-            
-    @commands.command()
-    @in_allowed_channel()
-    async def force_host(self, ctx, member: discord.Member):
-        """Force a user to the top of the hosting rotation."""
-        logger.info(f"🔄 Received command: !force_host {member.name}")
+    @host_command()
+    @app_commands.describe(member="The user to remove from the host list")
+    async def host_remove(self, interaction: discord.Interaction, member: discord.Member):
+        """Removes a user from the host list"""
+        logger.info(f"🔄 Received command: /host_remove {member.name}")
 
         try:
             database.connect()
             cursor = database.cursor
             
-            # Verify the host exists and is active
-            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
-                           (str(member.id),))
-            host = cursor.fetchone()
-            if not host:
-                await ctx.send(f"❌ {member.name} not found in active rotation.")
-                logger.warning(f"Host {member.name} not found or not active for force command")
-                database.close()
+            cursor.execute("DELETE FROM hosting_rotation WHERE discord_id=?", (str(member.id),))
+            if cursor.rowcount == 0:
+                await interaction.response.send_message(f"❌ {member.name} is not in the host list.")
                 return
                 
-            username, current_position = host
-            logger.info(f"Found host {username} at position {current_position}")
-            
-            # If already at position 1, no need to change
-            if current_position == 1:
-                await ctx.send(f"ℹ️ {username} is already at the top of the rotation.")
-                database.close()
-                return
-            
-            # Increment everyone's position who is ahead of this user
-            cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1 WHERE order_position < ? AND active=1", 
-                         (current_position,))
-            
-            # Move this user to position 1
-            cursor.execute("UPDATE hosting_rotation SET order_position = 1 WHERE discord_id = ?", 
-                         (str(member.id),))
-            
             database.conn.commit()
-            database.close()
-            
-            await ctx.send(f"✅ {username} has been moved to the top of the rotation!")
-            logger.info(f"✅ {username} has been moved to the top of the rotation")
+            await interaction.response.send_message(f"✅ {member.name} has been removed from the host list.")
+            logger.info(f"✅ Removed {member.name} from the host list")
             
         except Exception as e:
-            logger.error(f"Error in force_host command: {e}")
+            logger.error(f"Error removing host: {e}")
             database.conn.rollback()
+            await interaction.response.send_message("❌ An error occurred while processing this command.")
+        finally:
             database.close()
-            await ctx.send("❌ An error occurred while processing this command.")
 
-    @commands.command()
-    @in_allowed_channel()
-    async def swap_position(self, ctx, member1: discord.Member, member2: discord.Member):
-        """Swap the positions of two users in the hosting rotation."""
-        logger.info(f"🔄 Received command: !swap_position {member1.name} {member2.name}")
+    @host_command()
+    async def host_next(self, interaction: discord.Interaction):
+        """Shows who's next in the list"""
+        logger.info("🔄 Received command: /host_next")
+
+        host = database.getNextHost()
+        if host:
+            await interaction.response.send_message(
+                f"🎲 The next host is: **{host['username']}**"
+            )
+            logger.info(f"✅ Next host: {host['username']}")
+        else:
+            await interaction.response.send_message("❌ No active hosts found.")
+            logger.warning("⚠️ No active hosts found.")
+
+    @host_command()
+    @app_commands.describe(
+        member="The user to move",
+        position="Where to move them (top/bottom/next)",
+    )
+    @app_commands.choices(position=[
+        app_commands.Choice(name="Top of list", value="top"),
+        app_commands.Choice(name="Bottom of list", value="bottom"),
+        app_commands.Choice(name="Next in line", value="next")
+    ])
+    async def host_move(self, interaction: discord.Interaction, member: discord.Member, position: app_commands.Choice[str]):
+        """Move a host to a specific position"""
+        logger.info(f"🔄 Received command: /host_move {member.name} to {position.value}")
         
         try:
             database.connect()
             cursor = database.cursor
             
-            # Verify both hosts exist and are active
+            # Verify host exists and is active
+            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=?", (str(member.id),))
+            host = cursor.fetchone()
+            if not host:
+                await interaction.response.send_message(f"❌ {member.name} is not in the host list.")
+                return
+                
+            username, current_pos = host
+            
+            if position.value == "top":
+                # Move everyone else down one
+                cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1")
+                # Move target host to top
+                cursor.execute("UPDATE hosting_rotation SET order_position = 1 WHERE discord_id = ?", (str(member.id),))
+                msg = f"✅ {username} has been moved to the top of the list!"
+                
+            elif position.value == "bottom":
+                # Get max position
+                cursor.execute("SELECT MAX(order_position) FROM hosting_rotation")
+                max_pos = cursor.fetchone()[0]
+                # Move others up if needed
+                cursor.execute("UPDATE hosting_rotation SET order_position = order_position - 1 WHERE order_position > ?", 
+                             (current_pos,))
+                # Move target host to bottom
+                cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+                             (max_pos, str(member.id),))
+                msg = f"✅ {username} has been moved to the bottom of the list!"
+                
+            else:  # next
+                # Move to position 2 (right after current host)
+                cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1 WHERE order_position > 1")
+                cursor.execute("UPDATE hosting_rotation SET order_position = 2 WHERE discord_id = ?", (str(member.id),))
+                msg = f"✅ {username} will host next!"
+            
+            database.conn.commit()
+            await interaction.response.send_message(msg)
+            logger.info(f"✅ Successfully moved {username} to {position.value}")
+            
+        except Exception as e:
+            logger.error(f"Error moving host: {e}")
+            database.conn.rollback()
+            await interaction.response.send_message("❌ An error occurred while processing this command.")
+        finally:
+            database.close()
+
+    @host_command()
+    @app_commands.describe(first="First host", second="Second host")
+    async def host_swap(self, interaction: discord.Interaction, first: discord.Member, second: discord.Member):
+        """Swap the positions of two hosts"""
+        logger.info(f"🔄 Received command: /host_swap {first.name} {second.name}")
+        
+        try:
+            database.connect()
+            cursor = database.cursor
+            
             cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
-                           (str(member1.id),))
+                           (str(first.id),))
             host1 = cursor.fetchone()
             
             cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
-                           (str(member2.id),))
+                           (str(second.id),))
             host2 = cursor.fetchone()
             
             if not host1 or not host2:
                 missing = []
                 if not host1:
-                    missing.append(member1.name)
+                    missing.append(first.name)
                 if not host2:
-                    missing.append(member2.name)
+                    missing.append(second.name)
                     
-                await ctx.send(f"❌ {', '.join(missing)} not found in active rotation.")
+                await interaction.response.send_message(f"❌ {', '.join(missing)} not found in active rotation.")
                 logger.warning(f"Hosts not found or not active for swap command: {', '.join(missing)}")
                 database.close()
                 return
@@ -216,139 +184,96 @@ class HostingRotationCommands(commands.Cog):
             
             logger.info(f"Swapping {username1} (position {position1}) with {username2} (position {position2})")
             
-            # Swap positions
             cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
-                         (position2, str(member1.id)))
+                         (position2, str(first.id)))
             cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
-                         (position1, str(member2.id)))
+                         (position1, str(second.id)))
             
             database.conn.commit()
             database.close()
             
-            await ctx.send(f"✅ Swapped positions of {username1} and {username2}!")
+            await interaction.response.send_message(f"✅ Swapped positions of {username1} and {username2}!")
             logger.info(f"✅ Swapped positions of {username1} and {username2}")
             
         except Exception as e:
             logger.error(f"Error in swap_position command: {e}")
             database.conn.rollback()
             database.close()
-            await ctx.send("❌ An error occurred while processing this command.")
+            await interaction.response.send_message("❌ An error occurred while processing this command.")
 
-    @commands.command()
-    @in_allowed_channel()
-    async def send_to_back(self, ctx, member: discord.Member):
-        """Send a user to the back of the hosting rotation."""
-        logger.info(f"🔄 Received command: !send_to_back {member.name}")
-        
-        try:
-            database.connect()
-            cursor = database.cursor
-            
-            # Verify the host exists and is active
-            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
-                           (str(member.id),))
-            host = cursor.fetchone()
-            if not host:
-                await ctx.send(f"❌ {member.name} not found in active rotation.")
-                logger.warning(f"Host {member.name} not found or not active for send_to_back command")
-                database.close()
-                return
-                
-            username, current_position = host
-            
-            # Get the maximum position
-            cursor.execute("SELECT MAX(order_position) FROM hosting_rotation WHERE active=1")
-            max_position = cursor.fetchone()[0]
-            
-            # If already at the back, no need to change
-            if current_position == max_position:
-                await ctx.send(f"ℹ️ {username} is already at the back of the rotation.")
-                database.close()
-                return
-            
-            logger.info(f"Moving {username} from position {current_position} to the back")
-            
-            # Decrement everyone's position who is behind this user
-            cursor.execute("UPDATE hosting_rotation SET order_position = order_position - 1 WHERE order_position > ? AND active=1", 
-                         (current_position,))
-            
-            # Move this user to the back
-            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
-                         (max_position, str(member.id)))
-            
-            database.conn.commit()
-            database.close()
-            
-            await ctx.send(f"✅ {username} has been moved to the back of the rotation!")
-            logger.info(f"✅ {username} has been moved to the back of the rotation")
-            
-        except Exception as e:
-            logger.error(f"Error in send_to_back command: {e}")
-            database.conn.rollback()
-            database.close()
-            await ctx.send("❌ An error occurred while processing this command.")
+    @host_command()
+    async def host_rotate(self, interaction: discord.Interaction):
+        """Moves the current host to the bottom of the list"""
+        logger.info("🔄 Received command: /host_rotate")
 
-    @commands.command()
-    @in_allowed_channel()
-    async def hosting_help(self, ctx):
-        """Displays help information for all hosting rotation commands."""
-        logger.info("🔄 Received command: !hosting_help")
+        result = database.rotateHosts()
+        await interaction.response.send_message("✅ Hosting rotation updated!")
+        logger.info(f"✅ Hosting rotation has been updated. {result}")
+
+    @host_command()
+    async def host_list(self, interaction: discord.Interaction):
+        """Displays the current host list order"""
+        logger.info("🔄 Received command: /host_list")
+
+        hosts = database.getAllHosts()
         
-        # Create an embedded message for help information
+        if hosts:
+            embed = discord.Embed(
+                title="🎲 Current Hosting Rotation",
+                description="\n".join([f"{host['position']}. {host['username']}" for host in hosts]),
+                color=discord.Color.blue()
+            )
+            
+            await interaction.response.send_message(embed=embed)
+            logger.info(f"✅ Displayed host list with {len(hosts)} hosts")
+        else:
+            await interaction.response.send_message("❌ No active hosts found.")
+            logger.warning("⚠️ No active hosts found for host list.")
+
+    @host_command()
+    async def host_help(self, interaction: discord.Interaction):
+        """Shows help information for all host commands"""
+        logger.info("🔄 Received command: /host_help")
+        
         embed = discord.Embed(
-            title="🎲 Hosting Rotation Commands",
-            description="Here are all the commands available for managing the game hosting rotation:",
+            title="🎲 Host List Commands",
+            description="Here are all the commands available for managing the game host list:",
             color=discord.Color.blue()
         )
         
-        # Basic commands
         embed.add_field(
             name="📋 View Commands",
             value=(
-                "**`!next_host`** - Shows who's next in the rotation\n"
-                "**`!rotation_list`** - Displays the complete hosting order"
+                "**/host_next** - Shows who's next in the list\n"
+                "**/host_list** - Displays the complete host order"
             ),
             inline=False
         )
         
-        # Rotation management
         embed.add_field(
-            name="🔄 Rotation Commands",
+            name="🔄 List Management",
             value=(
-                "**`!rotate_hosts`** - Moves the current host to the back\n"
-                "**`!defer_host @user`** - User keeps their position but skips their turn\n"
-                "**`!force_host @user`** - Moves user to the top of the rotation\n"
-                "**`!send_to_back @user`** - Moves user to the end of the rotation\n"
-                "**`!swap_position @user1 @user2`** - Swaps the positions of two users"
+                "**/host_rotate** - Moves current host to the bottom\n"
+                "**/host_move @user [top/bottom/next]** - Move a host to a specific position\n"
+                "**/host_swap @user1 @user2** - Swaps the positions of two hosts"
             ),
             inline=False
         )
         
-        # User management
         embed.add_field(
             name="👤 User Management",
             value=(
-                "**`!add_host @user`** - Adds a new user to the rotation\n"
-                "**`!snooze_host @user`** - Temporarily removes user from rotation\n"
-                "**`!activate_host @user`** - Brings a snoozed user back into rotation"
+                "**/host_add @user** - Adds a new user to the list\n"
+                "**/host_remove @user** - Removes a user from the list"
             ),
             inline=False
         )
         
-        # Help
-        embed.add_field(
-            name="❓ Help",
-            value="**`!hosting_help`** - Shows this help message",
-            inline=False
-        )
-        
-        # Add a footer
         embed.set_footer(text="Commands must be used in the designated channel")
         
-        await ctx.send(embed=embed)
-        logger.info("✅ Displayed hosting help information")
+        await interaction.response.send_message(embed=embed)
+        logger.info("✅ Displayed host help information")
 
-# Required Setup Function for Bot Extensions
 async def setup(bot):
     await bot.add_cog(HostingRotationCommands(bot))
-    logger.info("✅ HostingRotationCommands cog has been loaded.")
+    logger.info("✅ HostingRotationCommands cog has been loaded")

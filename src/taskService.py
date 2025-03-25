@@ -3,7 +3,7 @@ from discord.ext import tasks
 from pathlib import Path
 from . import webscraper
 from src.database import Database
-from . import messageController
+from . import bga_commands  # Changed from messageController to bga_commands
 
 DB_PATH = Path("/data/database.db")
 database = Database(DB_PATH)
@@ -38,7 +38,7 @@ async def processGame(bot, game):
             f"New active player in game: {game.id} New player: {activePlayerId} Previous active player: {previousActivePlayerId}"
         )
         database.updateActivePlayer(game.id, activePlayerId)
-        await messageController.notifyer(bot, activePlayerId, game.id)
+        await bga_commands.notify_turn(bot, activePlayerId, game.id)  # Updated to use bga_commands
 
 
 # Task for fetching active player ids and update database if active player changed
