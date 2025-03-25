@@ -17,6 +17,9 @@ class BGACommands(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
+        self.config = Config.load()  # Load config per instance
+        self.database = Database(self.config.database_path)  # Create database per instance
+        self.notify_channel_id = self.config.notify_channel_id
 
     @app_commands.command(name="bga_unlink", description="Unlink your Discord account from BGA")
     async def bga_unlink(self, interaction: discord.Interaction):

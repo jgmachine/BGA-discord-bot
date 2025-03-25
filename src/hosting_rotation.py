@@ -28,6 +28,9 @@ class HostingRotationCommands(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.config = Config.load()  # Load config per instance
+        self.database = Database(self.config.database_path)  # Create database per instance
+        self.hosting_rotation_channel_id = self.config.hosting_rotation_channel_id
 
     @host_command()
     @app_commands.describe(member="The user to add to the host list")
