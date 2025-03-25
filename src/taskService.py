@@ -3,10 +3,11 @@ from discord.ext import tasks
 from pathlib import Path
 from . import webscraper
 from src.database import Database
+from src.config import Config
 from . import bga_commands  # Changed from messageController to bga_commands
 
-DB_PATH = Path("/data/database.db")
-database = Database(DB_PATH)
+config = Config.load()
+database = Database(config.database_path)
 
 
 # Fetching active player id for a game entity

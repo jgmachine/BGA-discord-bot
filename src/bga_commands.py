@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 import sqlite3
 from discord.ext import commands
 from discord import app_commands
@@ -7,13 +6,11 @@ import discord
 from . import webscraper
 from src.database import Database
 from . import utils
-import os
-from dotenv import load_dotenv
+from src.config import Config
 
-DB_PATH = Path("/data/database.db")
-database = Database(DB_PATH)
-load_dotenv()
-NOTIFY_CHANNEL_ID = int(os.getenv("NOTIFY_CHANNEL_ID", "0"))
+config = Config.load()
+database = Database(config.database_path)
+NOTIFY_CHANNEL_ID = config.notify_channel_id
 
 class BGACommands(commands.Cog):
     """Commands for managing Board Game Arena integration."""

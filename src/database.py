@@ -3,6 +3,7 @@ import logging
 import sqlite3
 from pathlib import Path
 from collections import namedtuple
+from src.config import Config
 
 # 🔹 Configure logging
 logging.basicConfig(
@@ -18,17 +19,16 @@ file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelnam
 host_logger.addHandler(file_handler)
 host_logger.setLevel(logging.INFO)
 
-# 🔹 Ensure the /data directory exists for persistent storage
-DB_DIR = Path("/data")
-DB_DIR.mkdir(parents=True, exist_ok=True)  # Ensures the directory exists
-DB_PATH = DB_DIR / "database.db"
+# Load configuration
+config = Config.load()
+config.data_dir.mkdir(parents=True, exist_ok=True)
 
 # 🔹 NamedTuple for Game Objects
 Game = namedtuple("Game", ["id", "url", "name", "activePlayerId"])
 
 
 class Database:
-    def __init__(self, db_file=DB_PATH):
+    def __init__(self, db_file=config.database_path):
         self.db_file = db_file
         self.conn = None
         self.cursor = None
