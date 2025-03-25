@@ -29,9 +29,8 @@ class HostingDatabase(BaseDatabase):
         """Adds a user to the hosting rotation."""
         host_logger.info(f"Adding host: discord_id={discord_id}, username={username}")
         try:
-            cursor = self._execute("SELECT MAX(order_position) FROM hosting_rotation")
-            result = cursor.fetchone()
-            max_pos = result[0] if result and result[0] is not None else 0
+            results = self._execute("SELECT MAX(order_position) FROM hosting_rotation")
+            max_pos = results[0][0] if results and results[0][0] is not None else 0
             next_position = max_pos + 1
             
             host_logger.debug(f"Next position calculated as {next_position}")
@@ -41,7 +40,7 @@ class HostingDatabase(BaseDatabase):
                 (discord_id, username, next_position)
             )
             
-            rows_affected = cursor.rowcount
+            rows_affected = cursor.rowcount if hasattr(cursor, 'rowcount') else 0
             host_logger.info(f"Host added successfully, rows affected: {rows_affected}")
             return rows_affected
         except Exception as e:
