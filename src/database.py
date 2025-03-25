@@ -43,7 +43,7 @@ class Database:
         logging.info(f"[DATABASE] Initialized at: {self.db_file}")
 
         # Ensure tables exist on startup
-        self.createTables()
+        self.create_tables()
 
     def connect(self):
         """🔹 Establishes a connection to the SQLite database."""
@@ -51,8 +51,8 @@ class Database:
         self.conn = sqlite3.connect(self.db_file)
         self.cursor = self.conn.cursor()
 
-    def createTables(self):
-        """🔹 Creates tables if they don't exist."""
+    def create_tables(self):
+        """Creates tables if they don't exist."""
         self.connect()
         self.cursor.execute(
             """
@@ -72,21 +72,16 @@ class Database:
             )
         """
         )
-        self.createHostingTable()
+        self.create_hosting_table()
         self.conn.commit()
         self.close()
         logging.info("[DATABASE] Tables checked/created successfully.")
 
-    # Alias with snake_case naming convention
-    def create_tables(self):
-        """Alias for createTables using snake_case naming convention."""
-        return self.createTables()
-
     # ───────────────────────────────────────────────────────────────
     # 🔹 HOSTING ROTATION FUNCTIONS
     # ───────────────────────────────────────────────────────────────
-    def createHostingTable(self):
-        """🔹 Creates the hosting rotation table if it doesn't exist."""
+    def create_hosting_table(self):
+        """Creates the hosting rotation table if it doesn't exist."""
         host_logger.info("Creating hosting rotation table if it doesn't exist")
         try:
             self.cursor.execute(
@@ -106,12 +101,7 @@ class Database:
             host_logger.error(f"Error creating hosting rotation table: {e}")
             raise
 
-    # Alias with snake_case naming convention
-    def create_hosting_table(self):
-        """Alias for createHostingTable using snake_case naming convention."""
-        return self.createHostingTable()
-
-    def addHost(self, discord_id, username):
+    def add_host(self, discord_id, username):
         """Adds a user to the hosting rotation."""
         host_logger.info(f"Adding host: discord_id={discord_id}, username={username}")
         try:
@@ -139,12 +129,7 @@ class Database:
             self.close()
             raise
 
-    # Alias with snake_case naming convention
-    def add_host(self, discord_id, username):
-        """Alias for addHost using snake_case naming convention."""
-        return self.addHost(discord_id, username)
-
-    def getNextHost(self):
+    def get_next_host(self):
         """Fetches the next user in the hosting rotation."""
         host_logger.info("Fetching next host")
         try:
@@ -166,12 +151,7 @@ class Database:
             self.close()
             raise
 
-    # Alias with snake_case naming convention
-    def get_next_host(self):
-        """Alias for getNextHost using snake_case naming convention."""
-        return self.getNextHost()
-
-    def rotateHosts(self):
+    def rotate_hosts(self):
         """Moves the current host to the back of the queue."""
         host_logger.info("Rotating hosts")
         try:
@@ -212,7 +192,7 @@ class Database:
                         (new_max + 1, host_id))
             
             # Run a final pass to ensure sequential ordering (no gaps)
-            self._resequencePositions()
+            self._resequence_positions()
             
             self.conn.commit()
             host_logger.info(f"Host {host_name} rotated to the end of the queue")
@@ -224,12 +204,7 @@ class Database:
             self.close()
             raise
 
-    # Alias with snake_case naming convention
-    def rotate_hosts(self):
-        """Alias for rotateHosts using snake_case naming convention."""
-        return self.rotateHosts()
-
-    def deferHost(self, discord_id):
+    def defer_host(self, discord_id):
         """Defers a host (keeps them at their current position)."""
         host_logger.info(f"Deferring host with discord_id={discord_id}")
         try:
@@ -261,12 +236,7 @@ class Database:
             self.close()
             raise
 
-    # Alias with snake_case naming convention
-    def defer_host(self, discord_id):
-        """Alias for deferHost using snake_case naming convention."""
-        return self.deferHost(discord_id)
-
-    def snoozeHost(self, discord_id):
+    def snooze_host(self, discord_id):
         """Temporarily removes a user from the hosting rotation."""
         host_logger.info(f"Snoozing host with discord_id={discord_id}")
         try:
@@ -299,12 +269,7 @@ class Database:
             self.close()
             raise
 
-    # Alias with snake_case naming convention
-    def snooze_host(self, discord_id):
-        """Alias for snoozeHost using snake_case naming convention."""
-        return self.snoozeHost(discord_id)
-
-    def activateHost(self, discord_id):
+    def activate_host(self, discord_id):
         """Re-adds a snoozed user to the hosting rotation."""
         host_logger.info(f"Activating host with discord_id={discord_id}")
         try:
@@ -337,13 +302,8 @@ class Database:
             self.conn.rollback()
             self.close()
             raise
-
-    # Alias with snake_case naming convention
-    def activate_host(self, discord_id):
-        """Alias for activateHost using snake_case naming convention."""
-        return self.activateHost(discord_id)
     
-    def getAllHosts(self):
+    def get_all_hosts(self):
         """Returns all active hosts in their current rotation order."""
         host_logger.info("Fetching all hosts in rotation order")
         try:
@@ -351,7 +311,7 @@ class Database:
                 cursor = self.cursor
                 
                 # Ensure there are no gaps in positions before fetching
-                self._resequencePositions()
+                self._resequence_positions()
                 
                 cursor.execute("SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC")
                 hosts = cursor.fetchall()
@@ -367,12 +327,7 @@ class Database:
             self.close()
             raise
 
-    # Alias with snake_case naming convention
-    def get_all_hosts(self):
-        """Alias for getAllHosts using snake_case naming convention."""
-        return self.getAllHosts()
-
-    def _resequencePositions(self):
+    def _resequence_positions(self):
         """Helper method to ensure host positions are sequential (1, 2, 3...) with no gaps."""
         try:
             # Get all active hosts ordered by their current position
@@ -392,41 +347,31 @@ class Database:
     # ───────────────────────────────────────────────────────────────
     # 🔹 USER MANAGEMENT FUNCTIONS 
     # ───────────────────────────────────────────────────────────────
-    def insertUserData(self, discordId, bgaId):
-        """✅ Adds a new user to the database."""
+    def insert_user_data(self, discord_id, bga_id):
+        """Adds a new user to the database."""
         self.connect()
         try:
             self.cursor.execute(
                 "INSERT INTO user_data (discord_id, bga_id) VALUES (?, ?)",
-                (discordId, bgaId),
+                (discord_id, bga_id),
             )
             self.conn.commit()
-            logging.info(f"[DATABASE] User {discordId} linked to BGA {bgaId}.")
+            logging.info(f"[DATABASE] User {discord_id} linked to BGA {bga_id}.")
         except sqlite3.IntegrityError:
-            logging.warning(f"[DATABASE] User {discordId} already exists.")
+            logging.warning(f"[DATABASE] User {discord_id} already exists.")
         finally:
             self.close()
 
-    # Alias with snake_case naming convention
-    def insert_user_data(self, discord_id, bga_id):
-        """Alias for insertUserData using snake_case naming convention."""
-        return self.insertUserData(discord_id, bga_id)
-
-    def deleteUserData(self, discord_id):
-        """❌ Removes a user from the database."""
+    def delete_user_data(self, discord_id):
+        """Removes a user from the database."""
         self.connect()
         self.cursor.execute("DELETE FROM user_data WHERE discord_id = ?", (discord_id,))
         self.conn.commit()
         self.close()
         logging.info(f"[DATABASE] User {discord_id} removed.")
 
-    # Alias with snake_case naming convention
-    def delete_user_data(self, discord_id):
-        """Alias for deleteUserData using snake_case naming convention."""
-        return self.deleteUserData(discord_id)
-
-    def getDiscordIdByBgaId(self, bga_id):
-        """🔍 Finds a Discord ID from a BGA ID."""
+    def get_discord_id_by_bga_id(self, bga_id):
+        """Finds a Discord ID from a BGA ID."""
         self.connect()
         self.cursor.execute(
             "SELECT discord_id FROM user_data WHERE bga_id = ?", (bga_id,)
@@ -435,91 +380,61 @@ class Database:
         self.close()
         return result[0] if result else None
 
-    # Alias with snake_case naming convention
-    def get_discord_id_by_bga_id(self, bga_id):
-        """Alias for getDiscordIdByBgaId using snake_case naming convention."""
-        return self.getDiscordIdByBgaId(bga_id)
-
-    def getAllBgaIds(self):
-        """🔍 Retrieves all BGA IDs."""
+    def get_all_bga_ids(self):
+        """Retrieves all BGA IDs."""
         self.connect()
         self.cursor.execute("SELECT bga_id FROM user_data")
         rows = self.cursor.fetchall()
         self.close()
         return [row[0] for row in rows]
 
-    # Alias with snake_case naming convention
-    def get_all_bga_ids(self):
-        """Alias for getAllBgaIds using snake_case naming convention."""
-        return self.getAllBgaIds()
-
     # ───────────────────────────────────────────────────────────────
     # 🔹 GAME MANAGEMENT FUNCTIONS
     # ───────────────────────────────────────────────────────────────
-    def insertGameData(self, id, url, gameName, activePlayerId):
-        """✅ Adds a new game entry."""
+    def insert_game_data(self, id, url, game_name, active_player_id):
+        """Adds a new game entry."""
         self.connect()
         try:
             self.cursor.execute(
                 "INSERT INTO game_data (id, url, game_name, active_player_id) VALUES (?, ?, ?, ?)",
-                (id, url, gameName, activePlayerId),
+                (id, url, game_name, active_player_id),
             )
             self.conn.commit()
-            logging.info(f"[DATABASE] Game {id} added ({gameName}).")
+            logging.info(f"[DATABASE] Game {id} added ({game_name}).")
         except sqlite3.Error as e:
             logging.error(f"[DATABASE ERROR] {e}")
         finally:
             self.close()
 
-    # Alias with snake_case naming convention
-    def insert_game_data(self, id, url, game_name, active_player_id):
-        """Alias for insertGameData using snake_case naming convention."""
-        return self.insertGameData(id, url, game_name, active_player_id)
-
-    def deleteGameData(self, id):
-        """❌ Removes a game entry."""
+    def delete_game_data(self, id):
+        """Removes a game entry."""
         self.connect()
         self.cursor.execute("DELETE FROM game_data WHERE id = ?", (id,))
         self.conn.commit()
         self.close()
         logging.info(f"[DATABASE] Game {id} removed.")
 
-    # Alias with snake_case naming convention
-    def delete_game_data(self, id):
-        """Alias for deleteGameData using snake_case naming convention."""
-        return self.deleteGameData(id)
-
-    def updateActivePlayer(self, id, activePlayerId):
-        """🔄 Updates the active player for a game."""
+    def update_active_player(self, id, active_player_id):
+        """Updates the active player for a game."""
         self.connect()
         self.cursor.execute(
             "UPDATE game_data SET active_player_id = ? WHERE id = ?",
-            (activePlayerId, id),
+            (active_player_id, id),
         )
         self.conn.commit()
         self.close()
-        logging.info(f"[DATABASE] Game {id} updated: Active Player → {activePlayerId}.")
+        logging.info(f"[DATABASE] Game {id} updated: Active Player → {active_player_id}.")
 
-    # Alias with snake_case naming convention
-    def update_active_player(self, id, active_player_id):
-        """Alias for updateActivePlayer using snake_case naming convention."""
-        return self.updateActivePlayer(id, active_player_id)
-
-    def getActivePlayer(self, id):
-        """🔍 Retrieves the active player ID for a game."""
+    def get_active_player(self, id):
+        """Retrieves the active player ID for a game."""
         self.connect()
         self.cursor.execute("SELECT active_player_id FROM game_data WHERE id = ?", (id,))
         result = self.cursor.fetchone()
         self.close()
         return result[0] if result else None
 
-    # Alias with snake_case naming convention
-    def get_active_player(self, id):
-        """Alias for getActivePlayer using snake_case naming convention."""
-        return self.getActivePlayer(id)
-
-    def getGameById(self, game_id):
-        """🔍 Retrieves a game by its ID."""
+    def get_game_by_id(self, game_id):
+        """Retrieves a game by its ID."""
         self.connect()
         self.cursor.execute(
             "SELECT id, url, game_name, active_player_id FROM game_data WHERE id = ?",
@@ -529,23 +444,13 @@ class Database:
         self.close()
         return Game(*result) if result else None
 
-    # Alias with snake_case naming convention
-    def get_game_by_id(self, game_id):
-        """Alias for getGameById using snake_case naming convention."""
-        return self.getGameById(game_id)
-
-    def getAllGames(self):
-        """🔍 Retrieves all games from the database."""
+    def get_all_games(self):
+        """Retrieves all games from the database."""
         self.connect()
         self.cursor.execute("SELECT id, url, game_name, active_player_id FROM game_data")
         games = self.cursor.fetchall()
         self.close()
         return [Game(*game) for game in games]
-
-    # Alias with snake_case naming convention
-    def get_all_games(self):
-        """Alias for getAllGames using snake_case naming convention."""
-        return self.getAllGames()
 
     def close(self):
         """🔹 Closes the database connection."""
