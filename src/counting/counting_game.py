@@ -19,35 +19,44 @@ class CountingGame(commands.Cog):
         self.target_number = random.randint(1, 100)
         self.last_counter = None
         self.counting_channel = None
-        self.is_initialized = False
+        self.ready = False
         self._load_game_state()
-        
-    async def initialize(self):
-        """Initialize the counting game and announce presence."""
-        if self.is_initialized:
-            return
-            
-        try:
-            self.counting_channel = self.bot.get_channel(self.config.counting_channel_id)
-            if not self.counting_channel:
-                logger.error(f"❌ Could not find counting channel: {self.config.counting_channel_id}")
-                return
-
-            # Announce bot presence and game state
-            await self.counting_channel.send(
-                "🎲 Counting game is ready!\n"
-                f"Current count is at {self.current_count}\n"
-                f"Next number needed: {self.current_count}"
-            )
-            logger.info(f"✅ Counting game initialized. Current count: {self.current_count}")
-            self.is_initialized = True
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize counting game: {e}")
+        logger.info(f"CountingGame initialized with channel ID: {self.config.counting_channel_id}")
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Handle initialization when bot is ready."""
-        await self.initialize()
+        if self.ready:  # Avoid duplicate initialization
+            return
+            
+        try:
+            # Ensure tables exist
+            with self.database.transaction():
+                self.database.create_tables()
+            
+            self.counting_channel = self.bot.get_channel(self.config.counting_channel_id)
+            if not self.counting_channel:
+                logger.error(f"❌ Could not find counting channel with ID: {self.config.counting_channel_id}")
+                return
+
+            # Force reload game state after ensuring tables exist
+            self._load_game_state()
+            
+            # Mark as ready and announce presence
+            self.ready = True
+            
+            startup_message = (
+                "🎲 **Counting Game Bot Online!**\n"
+                f"Current count: {self.current_count}\n"
+                f"Next number needed: {self.current_count}\n"
+                "Let's start counting!"
+            )
+            
+            await self.counting_channel.send(startup_message)
+            logger.info(f"✅ Counting game initialized in channel {self.counting_channel.name} ({self.counting_channel.id})")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize counting game: {e}", exc_info=True)
 
     def _load_game_state(self):
         """Load game state from database."""
@@ -159,7 +168,5 @@ class CountingGame(commands.Cog):
         await self._show_leaderboard(interaction.channel)
 
 async def setup(bot):
-    cog = CountingGame(bot)
-    await bot.add_cog(cog)
-    await cog.initialize()  # Initialize right after adding the cog
-    logger.info("✅ Counting game cog loaded and initialized")
+    await bot.add_cog(CountingGame(bot))
+    logger.info("✅ Counting game cog loaded")
