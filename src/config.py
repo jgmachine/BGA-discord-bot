@@ -21,6 +21,12 @@ class Config:
         
         is_production = os.getenv("RAILWAY_ENVIRONMENT_NAME") == "production"
         data_dir = Path("/data-prod" if is_production else "/data-dev")
+        
+        # Create data directory if it doesn't exist
+        data_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure proper permissions
+        os.system(f"chmod 777 {data_dir}")
+        
         database_path = data_dir / "database.db"
 
         return cls(

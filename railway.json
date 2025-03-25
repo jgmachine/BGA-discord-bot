@@ -1,8 +1,14 @@
 {
-    "volumes": [
-      {
-        "path": "/data",
-        "persistent": true
-      }
-    ]
-  }
+  "volumes": [
+    {
+      "$if": "RAILWAY_ENVIRONMENT_NAME == 'production'",
+      "path": "/data-prod",
+      "persistent": true
+    },
+    {
+      "$if": "RAILWAY_ENVIRONMENT_NAME != 'production'",
+      "path": "/data-dev",
+      "persistent": true
+    }
+  ]
+}
