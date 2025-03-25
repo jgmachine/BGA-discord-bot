@@ -54,7 +54,11 @@ class BGABot:
         try:
             await self.bot.load_extension("src.hosting_rotation")
             await self.bot.load_extension("src.bga_commands")
-            await self.bot.load_extension("src.counting.counting_game")  # Add this line
+            await self.bot.load_extension("src.counting.counting_game")
+            
+            # Add a small delay to ensure everything is initialized
+            await asyncio.sleep(1)
+            
             # Sync commands globally after loading extensions
             await self.bot.tree.sync()
             logging.info("✅ Extensions loaded and commands synced successfully.")
