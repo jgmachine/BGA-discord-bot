@@ -211,14 +211,13 @@ class HostingDatabase(BaseDatabase):
             # Ensure there are no gaps in positions before fetching
             self._resequence_positions()
             
-            cursor = self._execute(
+            results = self._execute(
                 "SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC"
             )
-            hosts = cursor.fetchall()
             
-            if hosts:
-                host_logger.info(f"Retrieved {len(hosts)} hosts in rotation order")
-                return [{"discord_id": host[0], "username": host[1], "position": host[2]} for host in hosts]
+            if results:
+                host_logger.info(f"Retrieved {len(results)} hosts in rotation order")
+                return [{"discord_id": host[0], "username": host[1], "position": host[2]} for host in results]
             else:
                 host_logger.warning("No active hosts found in rotation")
                 return []
@@ -230,19 +229,18 @@ class HostingDatabase(BaseDatabase):
         """Helper method to ensure host positions are sequential (1, 2, 3...) with no gaps."""
         try:
             # Get all active hosts ordered by their current position
-            cursor = self._execute(
+            results = self._execute(
                 "SELECT discord_id FROM hosting_rotation WHERE active=1 ORDER BY order_position ASC"
             )
-            hosts = cursor.fetchall()
             
             # Reassign positions sequentially
-            for idx, host in enumerate(hosts, 1):
+            for idx, host in enumerate(results, 1):
                 self._execute(
                     "UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?",
                     (idx, host[0])
                 )
             
-            host_logger.info(f"Resequenced positions for {len(hosts)} active hosts")
+            host_logger.info(f"Resequenced positions for {len(results)} active hosts")
         except Exception as e:
             host_logger.error(f"Error resequencing positions: {e}")
             raise

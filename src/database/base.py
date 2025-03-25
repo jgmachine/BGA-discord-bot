@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 from pathlib import Path
+from contextlib import contextmanager
 
 class BaseDatabase:
     """Base database class with common functionality."""
@@ -10,15 +11,20 @@ class BaseDatabase:
         self.conn = None
         self.cursor = None
         self.db_file.parent.mkdir(parents=True, exist_ok=True)
-        
-    def __enter__(self):
-        """Context manager entry."""
-        self.connect()
-        return self
-        
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        self.close()
+
+    @contextmanager
+    def transaction(self):
+        """Context manager for database transactions."""
+        try:
+            self.connect()
+            yield self.cursor
+            self.conn.commit()
+        except Exception as e:
+            if self.conn:
+                self.conn.rollback()
+            raise e
+        finally:
+            self.close()
 
     def connect(self):
         """Establishes a connection to the SQLite database."""
@@ -30,6 +36,8 @@ class BaseDatabase:
         """Closes the database connection."""
         if self.conn:
             self.conn.close()
+            self.conn = None
+            self.cursor = None
             logging.info("[DATABASE] Connection closed.")
 
     def create_tables(self):
@@ -37,17 +45,14 @@ class BaseDatabase:
         raise NotImplementedError("Subclasses must implement create_tables()")
 
     def _execute(self, sql, params=None):
-        """Execute SQL with error handling and connection management."""
-        try:
-            self.connect()
+        """Execute SQL and return results before connection close."""
+        with self.transaction() as cursor:
             if params:
-                self.cursor.execute(sql, params)
+                cursor.execute(sql, params)
             else:
-                self.cursor.execute(sql)
-            self.conn.commit()
-            return self.cursor
-        except Exception as e:
-            self.conn.rollback()
-            raise e
-        finally:
-            self.close()
+                cursor.execute(sql)
+            try:
+                return cursor.fetchall()
+            except sqlite3.OperationalError:
+                # No results to fetch (e.g., for INSERT/UPDATE)
+                return cursor
