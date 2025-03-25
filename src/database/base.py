@@ -78,7 +78,13 @@ class BaseDatabase:
             else:
                 cursor.execute(sql)
             try:
-                return cursor.fetchall()
+                results = cursor.fetchall()
+                # If we got results, return them
+                return results
             except sqlite3.OperationalError:
-                # No results to fetch (e.g., for INSERT/UPDATE)
-                return cursor
+                # For statements that don't return results (INSERT/UPDATE/DELETE)
+                # return the cursor for rowcount access
+                if cursor.rowcount >= 0:  # -1 means no rows affected
+                    return cursor
+                # For other cases (like CREATE TABLE), return empty list
+                return []

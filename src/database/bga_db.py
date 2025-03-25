@@ -51,9 +51,9 @@ class BGADatabase(BaseDatabase):
 
     def get_all_bga_ids(self):
         """Retrieves all BGA IDs."""
-        cursor = self._execute("SELECT bga_id FROM user_data")
-        rows = cursor.fetchall()
-        return [row[0] for row in rows]
+        results = self._execute("SELECT bga_id FROM user_data")
+        # results is already a list of tuples from fetchall()
+        return [row[0] for row in results] if results else []
 
     # Game Management
     def insert_game_data(self, id, url, game_name, active_player_id):
