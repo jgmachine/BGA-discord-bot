@@ -23,15 +23,15 @@ class BGACommands(commands.Cog):
 
     @app_commands.command(name="bga_unlink", description="Unlink your Discord account from BGA")
     async def bga_unlink(self, interaction: discord.Interaction):
-        database.deleteUserData(interaction.user.id)
+        database.delete_user_data(interaction.user.id)
         await interaction.response.send_message("BGA account unlinked!")
 
     @app_commands.command(name="bga_untrack", description="Stop tracking a BGA game")
     @app_commands.describe(game_id="The ID of the BGA game to stop tracking")
     async def bga_untrack(self, interaction: discord.Interaction, game_id: str):
         try:
-            game = database.getGameById(game_id)
-            database.deleteGameData(game_id)
+            game = database.get_game_by_id(game_id)
+            database.delete_game_data(game_id)
             await interaction.response.send_message(f"Stopped tracking {game.name} (ID: {game.id})")
         except Exception as e:
             logging.error(f"Error when removing game: {e}")
@@ -44,7 +44,7 @@ class BGACommands(commands.Cog):
             game_id = utils.extractGameId(url)
             game_name, active_player_id = await webscraper.getGameInfo(url)
 
-            database.insertGameData(game_id, url, game_name, active_player_id)
+            database.insert_game_data(game_id, url, game_name, active_player_id)
 
             await interaction.response.send_message(
                 f"Now tracking BGA game: {game_name} (ID: {game_id})"
@@ -61,7 +61,7 @@ class BGACommands(commands.Cog):
     @app_commands.describe(bga_id="Your Board Game Arena username")
     async def bga_link(self, interaction: discord.Interaction, bga_id: str):
         try:
-            database.insertUserData(discordId=interaction.user.id, bgaId=bga_id)
+            database.insert_user_data(discordId=interaction.user.id, bgaId=bga_id)
             await interaction.response.send_message(f"Successfully linked to BGA account: {bga_id}")
         except sqlite3.IntegrityError as e:
             logging.error(f"Error when linking BGA account: {e}")
@@ -70,7 +70,7 @@ class BGACommands(commands.Cog):
     @app_commands.command(name="bga_users", description="Show all linked BGA users (debug)")
     async def bga_users(self, interaction: discord.Interaction):
         try:
-            users = database.getAllBgaIds()
+            users = database.get_all_bga_ids()
             if users:
                 await interaction.response.send_message(f"Linked BGA accounts: {users}")
             else:
@@ -79,15 +79,39 @@ class BGACommands(commands.Cog):
             await interaction.response.send_message(f"Database error: {e}")
             logging.error(f"Database error: {e}")
 
+    @app_commands.command(name="bga_games", description="Show all tracked BGA games")
+    async def bga_games(self, interaction: discord.Interaction):
+        """Shows all games currently being tracked"""
+        try:
+            games = database.get_all_games()
+            if games:
+                embed = discord.Embed(
+                    title="🎲 Tracked BGA Games",
+                    color=discord.Color.blue()
+                )
+                for game in games:
+                    embed.add_field(
+                        name=f"{game.name} (ID: {game.id})",
+                        value=f"[Game Link]({game.url})",
+                        inline=False
+                    )
+                await interaction.response.send_message(embed=embed)
+                logging.info(f"✅ Displayed {len(games)} tracked games")
+            else:
+                await interaction.response.send_message("No games currently being tracked.")
+        except Exception as e:
+            await interaction.response.send_message(f"Database error: {e}")
+            logging.error(f"Database error: {e}")
+
 async def notify_turn(bot, bga_id, game_id):
     """Notify a user that it's their turn in a BGA game."""
     logging.info(f"Notifying turn for BGA game {game_id}, player {bga_id}")
 
-    discord_id = database.getDiscordIdByBgaId(bga_id)
-    if discord_id:
+    discord_id = database.get_discord_id_by_bga_id(bga_id)
+    if (discord_id):
         mention = f"<@{discord_id}>"
         channel = bot.get_channel(NOTIFY_CHANNEL_ID)
-        game = database.getGameById(game_id)
+        game = database.get_game_by_id(game_id)
 
         try:
             await channel.send(

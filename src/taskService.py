@@ -14,13 +14,13 @@ class BGATaskService:
     async def process_game(self, bot, game):
         logging.info(f"Fetching active player for game: {game.name} with id: {game.id}")
         activePlayerId = await webscraper.fetchActivePlayer(game.url)
-        previousActivePlayerId = self.database.getActivePlayer(game.id)
+        previousActivePlayerId = self.database.get_active_player(game.id)
         logging.info(f"Active player id: {activePlayerId}")
         if activePlayerId == None:
             logging.info("No active player id found. Checking if the game has ended")
             if await webscraper.checkIfGameEnded(game.url):
                 logging.info("Game results list found, removing game from monitoring")
-                self.database.deleteGameData(game.id)
+                self.database.delete_game_data(game.id)
             else:
                 logging.info("Game results list not found. Keep monitoring game..")
 
@@ -31,12 +31,12 @@ class BGATaskService:
             logging.info(
                 f"New active player in game: {game.id} New player: {activePlayerId} Previous active player: {previousActivePlayerId}"
             )
-            self.database.updateActivePlayer(game.id, activePlayerId)
+            self.database.update_active_player(game.id, activePlayerId)
             await bga_commands.notify_turn(bot, activePlayerId, game.id)  # Updated to use bga_commands
 
     @tasks.loop(minutes=1)
     async def process_games(self, bot):
-        games = self.database.getAllGames()
+        games = self.database.get_all_games()
         logging.info(f"Games: {games}")
         for game in games:
             await self.process_game(bot, game)
