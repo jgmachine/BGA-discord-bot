@@ -19,19 +19,16 @@ file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelnam
 host_logger.addHandler(file_handler)
 host_logger.setLevel(logging.INFO)
 
-# Load configuration
-config = Config.load()
-config.data_dir.mkdir(parents=True, exist_ok=True)
-
-# 🔹 NamedTuple for Game Objects
+# Remove global config/database initialization
 Game = namedtuple("Game", ["id", "url", "name", "activePlayerId"])
 
-
 class Database:
-    def __init__(self, db_file=config.database_path):
+    def __init__(self, db_file):
         self.db_file = db_file
         self.conn = None
         self.cursor = None
+        # Create parent directory if it doesn't exist
+        self.db_file.parent.mkdir(parents=True, exist_ok=True)
 
     def __enter__(self):
         """Context manager entry."""

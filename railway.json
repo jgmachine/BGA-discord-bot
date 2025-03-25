@@ -1,0 +1,17 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "volumes": [
+    {
+      "name": "bga-db-prod",
+      "$if": "RAILWAY_ENVIRONMENT_NAME == 'production'",
+      "path": "/data-prod",
+      "persistent": true
+    },
+    {
+      "name": "bga-db-dev",
+      "$if": "RAILWAY_ENVIRONMENT_NAME != 'production'",
+      "path": "/data-dev",
+      "persistent": true
+    }
+  ]
+}
