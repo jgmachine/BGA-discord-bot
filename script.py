@@ -33,7 +33,12 @@ class BGABot:
         """Initialize Discord bot."""
         intents = discord.Intents.default()
         intents.message_content = True
-        self.bot = commands.Bot(command_prefix="!", intents=intents)
+        intents.messages = True  # Make sure we can see messages
+        self.bot = commands.Bot(
+            command_prefix="!",
+            intents=intents,
+            description="BGA Discord Bot with counting game"
+        )
         
     async def _load_extensions(self) -> None:
         """Load bot command extensions."""

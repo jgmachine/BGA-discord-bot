@@ -18,7 +18,26 @@ class CountingGame(commands.Cog):
         self.current_count = 0
         self.target_number = random.randint(1, 100)
         self.last_counter = None
+        self.counting_channel = None
         self._load_game_state()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Handle initialization when bot is ready."""
+        self.counting_channel = self.bot.get_channel(self.config.counting_channel_id)
+        if not self.counting_channel:
+            logger.error("❌ Could not find counting channel!")
+            return
+
+        # Announce bot presence and game state
+        if self.current_count == 0:
+            await self.counting_channel.send("🎲 Hello! Let's start counting from 0!")
+        else:
+            await self.counting_channel.send(
+                f"🎲 I'm back! We left off at {self.current_count}. "
+                f"Next number should be {self.current_count}!"
+            )
+        logger.info(f"✅ Counting game initialized. Current count: {self.current_count}")
 
     def _load_game_state(self):
         """Load game state from database."""
@@ -70,37 +89,45 @@ class CountingGame(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Handle counting channel messages."""
-        if message.author.bot or message.channel.id != self.config.counting_channel_id:
+        """Monitor counting channel for numbers."""
+        # Skip if wrong channel or bot message
+        if (message.channel.id != self.config.counting_channel_id or 
+            message.author.bot):
             return
 
-        if message.content.isdigit():
-            number = int(message.content)
-            
-            if number != self.current_count:
-                await message.channel.send("❌ Wrong number! Try again!")
-                return
-                
-            if message.author.id == self.last_counter:
-                await message.channel.send("❌ Wait for someone else to go!")
-                return
+        # Only process if message contains a number
+        if not message.content.strip().isdigit():
+            return
 
-            self.last_counter = message.author.id
+        number = int(message.content)
+        
+        if number != self.current_count:
+            await message.channel.send(f"❌ Wrong number! We're at {self.current_count}, so the next number should be {self.current_count}!")
+            return
             
-            if number == self.target_number:
-                self._record_win(message.author.id)
-                await message.channel.send("🦢 HONK HONK! We have a winner!")
-                await message.channel.send(f"Congratulations {message.author.mention}, you're today's Silly Goose! 🎉")
-                await self._show_leaderboard(message.channel)
-                
-                self.current_count = 0
-                self.target_number = random.randint(1, 100)
-                self.last_counter = None
-                await message.channel.send("New round starting! Begin at 0!")
-            else:
-                self.current_count += 1
+        if message.author.id == self.last_counter:
+            await message.channel.send("❌ Wait for someone else to go!")
+            return
+
+        # Valid number
+        self.last_counter = message.author.id
+        
+        if number == self.target_number:
+            self._record_win(message.author.id)
+            await message.channel.send("🦢 HONK HONK! We have a winner!")
+            await message.channel.send(f"Congratulations {message.author.mention}, you're today's Silly Goose! 🎉")
+            await self._show_leaderboard(message.channel)
             
-            self._save_game_state()
+            self.current_count = 0
+            self.target_number = random.randint(1, 100)
+            self.last_counter = None
+            await message.channel.send("New round starting! Begin at 0!")
+        else:
+            self.current_count += 1
+            # Optional: React to confirm valid number
+            await message.add_reaction("✅")
+        
+        self._save_game_state()
 
     @app_commands.command(name="counting_new", description="Start a new counting game")
     @app_commands.default_permissions(administrator=True)
