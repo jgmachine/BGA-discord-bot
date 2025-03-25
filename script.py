@@ -23,11 +23,20 @@ class BGABot:
         
     def _setup_database(self) -> None:
         """Initialize database connection."""
-        self.config.data_dir.mkdir(parents=True, exist_ok=True)
-        self.database = Database(self.config.database_path)
-        with self.database.transaction():
-            self.database.create_tables()
-        logging.info(f"✅ Database initialized at {self.config.database_path}")
+        try:
+            self.config.data_dir.mkdir(parents=True, exist_ok=True)
+            self.database = Database(self.config.database_path)
+            with self.database.transaction():
+                # Create tables for all database components
+                self.database.create_tables()
+                # Explicitly create tables for each component
+                self.database.create_bga_tables()
+                self.database.create_hosting_tables()
+                self.database.create_counting_tables()
+            logging.info(f"✅ Database initialized at {self.config.database_path}")
+        except Exception as e:
+            logging.error(f"❌ Failed to initialize database: {e}")
+            raise
         
     def _setup_bot(self) -> None:
         """Initialize Discord bot."""
