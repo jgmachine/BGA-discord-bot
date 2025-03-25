@@ -98,5 +98,5 @@ class BGADatabase(BaseDatabase):
     def get_all_games(self):
         """Retrieves all games from the database."""
         cursor = self._execute("SELECT id, url, game_name, active_player_id FROM game_data")
-        games = cursor.fetchall()
-        return [Game(*game) for game in games]
+        games = cursor.fetchall()  # Fetch before connection closes
+        return [Game(*game) for game in games]  # Process after fetch
