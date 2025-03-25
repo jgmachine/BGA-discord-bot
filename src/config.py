@@ -8,19 +8,18 @@ from dotenv import load_dotenv
 class Config:
     """Central configuration management."""
     discord_token: str
+    discord_app_id: Optional[str]
     notify_channel_id: int
     hosting_rotation_channel_id: int
     data_dir: Path
     database_path: Path
-    is_production: bool
 
     @classmethod
     def load(cls) -> 'Config':
         """Load configuration from environment variables."""
         load_dotenv()
-        
-        is_production = os.getenv("RAILWAY_ENVIRONMENT_NAME") == "production"
-        data_dir = Path("/data-prod" if is_production else "/data-dev")
+
+        data_dir = Path("/data")
         
         # Create data directory if it doesn't exist
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -31,9 +30,9 @@ class Config:
 
         return cls(
             discord_token=os.getenv("DISCORD_TOKEN", ""),
+            discord_app_id=os.getenv("DISCORD_APP_ID"),
             notify_channel_id=int(os.getenv("NOTIFY_CHANNEL_ID", "0")),
             hosting_rotation_channel_id=int(os.getenv("HOSTING_ROTATION_CHANNEL_ID", "0")),
             data_dir=data_dir,
-            database_path=database_path,
-            is_production=is_production
+            database_path=database_path
         )
