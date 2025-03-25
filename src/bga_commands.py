@@ -79,12 +79,36 @@ class BGACommands(commands.Cog):
             await interaction.response.send_message(f"Database error: {e}")
             logging.error(f"Database error: {e}")
 
+    @app_commands.command(name="bga_games", description="Show all tracked BGA games")
+    async def bga_games(self, interaction: discord.Interaction):
+        """Shows all games currently being tracked"""
+        try:
+            games = database.get_all_games()
+            if games:
+                embed = discord.Embed(
+                    title="🎲 Tracked BGA Games",
+                    color=discord.Color.blue()
+                )
+                for game in games:
+                    embed.add_field(
+                        name=f"{game.name} (ID: {game.id})",
+                        value=f"[Game Link]({game.url})",
+                        inline=False
+                    )
+                await interaction.response.send_message(embed=embed)
+                logging.info(f"✅ Displayed {len(games)} tracked games")
+            else:
+                await interaction.response.send_message("No games currently being tracked.")
+        except Exception as e:
+            await interaction.response.send_message(f"Database error: {e}")
+            logging.error(f"Database error: {e}")
+
 async def notify_turn(bot, bga_id, game_id):
     """Notify a user that it's their turn in a BGA game."""
     logging.info(f"Notifying turn for BGA game {game_id}, player {bga_id}")
 
     discord_id = database.get_discord_id_by_bga_id(bga_id)
-    if discord_id:
+    if (discord_id):
         mention = f"<@{discord_id}>"
         channel = bot.get_channel(NOTIFY_CHANNEL_ID)
         game = database.get_game_by_id(game_id)
