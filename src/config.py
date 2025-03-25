@@ -11,6 +11,7 @@ class Config:
     discord_app_id: Optional[str]
     notify_channel_id: int
     hosting_rotation_channel_id: int
+    counting_channel_id: int
     data_dir: Path
     database_path: Path
 
@@ -33,6 +34,7 @@ class Config:
             discord_app_id=os.getenv("DISCORD_APP_ID"),
             notify_channel_id=int(os.getenv("NOTIFY_CHANNEL_ID", "0")),
             hosting_rotation_channel_id=int(os.getenv("HOSTING_ROTATION_CHANNEL_ID", "0")),
+            counting_channel_id=int(os.getenv("COUNTING_CHANNEL_ID", "0")),
             data_dir=data_dir,
             database_path=database_path
         )
