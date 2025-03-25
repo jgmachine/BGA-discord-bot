@@ -12,13 +12,21 @@ class Config:
     hosting_rotation_channel_id: int
     data_dir: Path
     database_path: Path
+    is_production: bool
 
     @classmethod
     def load(cls) -> 'Config':
         """Load configuration from environment variables."""
         load_dotenv()
         
-        data_dir = Path("/data")
+        is_production = os.getenv("RAILWAY_ENVIRONMENT_NAME") == "production"
+        data_dir = Path("/data-prod" if is_production else "/data-dev")
+        
+        # Create data directory if it doesn't exist
+        data_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure proper permissions
+        os.system(f"chmod 777 {data_dir}")
+        
         database_path = data_dir / "database.db"
 
         return cls(
@@ -26,5 +34,6 @@ class Config:
             notify_channel_id=int(os.getenv("NOTIFY_CHANNEL_ID", "0")),
             hosting_rotation_channel_id=int(os.getenv("HOSTING_ROTATION_CHANNEL_ID", "0")),
             data_dir=data_dir,
-            database_path=database_path
+            database_path=database_path,
+            is_production=is_production
         )

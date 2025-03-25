@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 import sqlite3
 from discord.ext import commands
 from discord import app_commands
@@ -7,13 +6,11 @@ import discord
 from . import webscraper
 from src.database import Database
 from . import utils
-import os
-from dotenv import load_dotenv
+from src.config import Config
 
-DB_PATH = Path("/data/database.db")
-database = Database(DB_PATH)
-load_dotenv()
-NOTIFY_CHANNEL_ID = int(os.getenv("NOTIFY_CHANNEL_ID", "0"))
+config = Config.load()
+database = Database(config.database_path)
+NOTIFY_CHANNEL_ID = config.notify_channel_id
 
 class BGACommands(commands.Cog):
     """Commands for managing Board Game Arena integration."""
@@ -70,14 +67,9 @@ class BGACommands(commands.Cog):
     @app_commands.command(name="bga_users", description="Show all linked BGA users (debug)")
     async def bga_users(self, interaction: discord.Interaction):
         try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM user_data")
-            rows = cursor.fetchall()
-            conn.close()
-
-            if rows:
-                await interaction.response.send_message(f"Linked BGA accounts: {rows}")
+            users = database.getAllBgaIds()
+            if users:
+                await interaction.response.send_message(f"Linked BGA accounts: {users}")
             else:
                 await interaction.response.send_message("No linked BGA accounts found.")
         except Exception as e:

@@ -3,14 +3,15 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import logging
-from pathlib import Path
 from src.database import Database
+from src.config import Config
 
-# Setup Logging for Commands
 logger = logging.getLogger(__name__)
+config = Config.load()
 
-# Define Allowed Channel for Commands
-HOSTING_ROTATION_CHANNEL_ID = int(os.getenv("HOSTING_ROTATION_CHANNEL_ID", "0"))
+# Use config values
+HOSTING_ROTATION_CHANNEL_ID = config.hosting_rotation_channel_id
+database = Database(config.database_path)
 
 def host_command():
     """Combined decorator for host commands."""
@@ -21,11 +22,6 @@ def host_command():
             )
         )
     return decorator
-
-# Create a Database Instance
-DB_DIR = Path("/data")
-DB_PATH = DB_DIR / "database.db"
-database = Database(DB_PATH)
 
 class HostingRotationCommands(commands.Cog):
     """Commands for managing the game hosts."""
@@ -268,6 +264,10 @@ class HostingRotationCommands(commands.Cog):
             ),
             inline=False
         )
+        
+        embed.set_footer(text="Commands must be used in the designated channel")
+        
+        await interaction.response.send_message(embed=embed)
         
         embed.set_footer(text="Commands must be used in the designated channel")
         
