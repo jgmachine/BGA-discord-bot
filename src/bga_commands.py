@@ -67,14 +67,9 @@ class BGACommands(commands.Cog):
     @app_commands.command(name="bga_users", description="Show all linked BGA users (debug)")
     async def bga_users(self, interaction: discord.Interaction):
         try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM user_data")
-            rows = cursor.fetchall()
-            conn.close()
-
-            if rows:
-                await interaction.response.send_message(f"Linked BGA accounts: {rows}")
+            users = database.getAllBgaIds()
+            if users:
+                await interaction.response.send_message(f"Linked BGA accounts: {users}")
             else:
                 await interaction.response.send_message("No linked BGA accounts found.")
         except Exception as e:
