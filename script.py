@@ -23,23 +23,38 @@ class BGABot:
         
     def _setup_database(self) -> None:
         """Initialize database connection."""
-        self.config.data_dir.mkdir(parents=True, exist_ok=True)
-        self.database = Database(self.config.database_path)
-        with self.database.transaction():
-            self.database.create_tables()
-        logging.info(f"✅ Database initialized at {self.config.database_path}")
+        try:
+            self.config.data_dir.mkdir(parents=True, exist_ok=True)
+            self.database = Database(self.config.database_path)
+            with self.database.transaction():
+                # Create tables for all database components
+                self.database.create_tables()
+                # Explicitly create tables for each component
+                self.database.create_bga_tables()
+                self.database.create_hosting_tables()
+                self.database.create_counting_tables()
+            logging.info(f"✅ Database initialized at {self.config.database_path}")
+        except Exception as e:
+            logging.error(f"❌ Failed to initialize database: {e}")
+            raise
         
     def _setup_bot(self) -> None:
         """Initialize Discord bot."""
         intents = discord.Intents.default()
         intents.message_content = True
-        self.bot = commands.Bot(command_prefix="!", intents=intents)
+        intents.messages = True  # Make sure we can see messages
+        self.bot = commands.Bot(
+            command_prefix="!",
+            intents=intents,
+            description="BGA Discord Bot with counting game"
+        )
         
     async def _load_extensions(self) -> None:
         """Load bot command extensions."""
         try:
             await self.bot.load_extension("src.hosting_rotation")
             await self.bot.load_extension("src.bga_commands")
+            await self.bot.load_extension("src.counting.counting_game")  # Add this line
             # Sync commands globally after loading extensions
             await self.bot.tree.sync()
             logging.info("✅ Extensions loaded and commands synced successfully.")
@@ -54,9 +69,13 @@ class BGABot:
         @self.bot.event
         async def on_ready():
             logging.info(f"✅ Logged in as {self.bot.user}")
-            # Load extensions and sync commands when bot is ready
             await self._load_extensions()
             taskService.processGames.start(self.bot)
+            
+            # Get the counting game cog and announce status
+            counting_game = self.bot.get_cog('CountingGame')
+            if counting_game:
+                await counting_game.announce_game_status()
             
         try:
             await self.bot.start(self.config.discord_token)

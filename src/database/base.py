@@ -68,6 +68,7 @@ class BaseDatabase:
 
     def create_tables(self):
         """Creates all required tables."""
+        # Let subclasses create their tables
         raise NotImplementedError("Subclasses must implement create_tables()")
 
     def _execute(self, sql, params=None):
