@@ -19,8 +19,14 @@ class CountingGame(commands.Cog):
         self.bot = bot
         self.config = Config.load()
         self.database = Database(self.config.database_path)
+        
+        # Initialize database tables immediately
+        logger.info("Creating database tables...")
+        with self.database.transaction():
+            self.database.create_tables()
+        
         self.current_count = 0
-        self.target_number = None  # Initialize to None, let _load_game_state set it
+        self.target_number = None
         self.last_counter = None
         self.counting_channel = None
         self.ready = False
@@ -72,27 +78,27 @@ class CountingGame(commands.Cog):
             return
             
         try:
-            # Ensure tables exist
-            with self.database.transaction():
-                self.database.create_tables()
+            logger.info("🔄 Starting counting game initialization...")
             
+            logger.info("Finding counting channel...")
             self.counting_channel = self.bot.get_channel(self.config.counting_channel_id)
             if not self.counting_channel:
                 logger.error(f"❌ Could not find counting channel with ID: {self.config.counting_channel_id}")
                 return
 
             # Force reload game state after ensuring tables exist
+            logger.info("Loading game state...")
             self._load_game_state()
             self.ready = True
             
-            # Send a single combined message with GIF
+            logger.info("Sending startup message...")
             try:
                 await self.counting_channel.send(
                     f"🎲 **Counting Game is Ready!**\n"
                     f"Current count: `{self.current_count}`\n"
                     f"{self._get_random_spawn_gif()}"
                 )
-                logger.info("✅ Counting game startup message sent successfully")
+                logger.info("✅ Counting game startup complete!")
             except Exception as e:
                 logger.error(f"Failed to send startup message: {e}")
             
@@ -172,6 +178,7 @@ class CountingGame(commands.Cog):
             
         if message.author.id == self.last_counter:
             await message.add_reaction(self._get_random_negative_emoji())
+            await message.channel.send(f"❌ Wait your turn!.")
             return
 
         self.last_counter = message.author.id
