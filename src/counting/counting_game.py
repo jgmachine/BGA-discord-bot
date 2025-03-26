@@ -13,7 +13,7 @@ class CountingGame(commands.Cog):
     """Commands and logic for the counting game."""
     
     # Class constant for target number range
-    TARGET_RANGE = (1, 10)  # Easier for testing - change to (1, 100) for production
+    TARGET_RANGE = (1, 100)  # Easier for testing - change to (1, 100) for production
     
     def __init__(self, bot):
         self.bot = bot
