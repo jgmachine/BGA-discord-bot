@@ -113,7 +113,7 @@ class CountingGame(commands.Cog):
     def _load_game_state(self):
         """Load game state from database."""
         state = self.database.get_game_state()
-        if state:
+        if (state):
             self.current_count, self.target_number, self.last_counter = state
         else:
             # Initialize game state
@@ -148,8 +148,12 @@ class CountingGame(commands.Cog):
         )
 
         for i, (user_id, wins) in enumerate(leaders, 1):
-            user = self.bot.get_user(user_id)
-            name = user.display_name if user else f"User {user_id}"
+            try:
+                user = await self.bot.fetch_user(user_id)
+                name = user.name if user else f"Unknown User ({user_id})"
+            except discord.NotFound:
+                name = f"Unknown User ({user_id})"
+            
             embed.add_field(
                 name=f"#{i} {name}",
                 value=f"{wins} {'win' if wins == 1 else 'wins'}",
@@ -191,10 +195,10 @@ class CountingGame(commands.Cog):
             await message.channel.send(f"Congratulations {message.author.mention}, you are now the holder of the Silly Goose! 🎉")
             await self._show_leaderboard(message.channel)
             
-            self.current_count = 0
+            self.current_count = -1
             self.target_number = self._generate_target()
             self.last_counter = None
-            await message.channel.send("New round starting! Begin at 0!")
+            await message.channel.send("New round starting! I'm a computer, so start at 0!")
         else:
             await message.add_reaction("✅")
         
