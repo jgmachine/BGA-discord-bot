@@ -135,12 +135,11 @@ class CountingGame(commands.Cog):
         self.database.record_win(user_id)
 
     async def _show_leaderboard(self, channel):
-        """Display the counting game leaderboard."""
+        """Create and return the leaderboard embed."""
         leaders = self.database.get_leaderboard()
 
         if not leaders:
-            await channel.send("No winners yet!")
-            return
+            return "No winners yet!"
 
         embed = discord.Embed(
             title="🦢 Silly Goose Leaderboard",
@@ -160,7 +159,7 @@ class CountingGame(commands.Cog):
                 inline=False
             )
 
-        await channel.send(embed=embed)
+        return embed
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -173,7 +172,7 @@ class CountingGame(commands.Cog):
             return
 
         number = int(message.content)
-        expected_number = self.current_count + 1  # This is the key change
+        expected_number = self.current_count + 1
         
         if number != expected_number:
             await message.add_reaction(self._get_random_negative_emoji())
@@ -186,14 +185,19 @@ class CountingGame(commands.Cog):
             return
 
         self.last_counter = message.author.id
-        self.current_count = number  # Update the count with the new number
+        self.current_count = number
         
         if number == self.target_number:
             self._record_win(message.author.id)
             await message.channel.send(self._get_random_goose_gif())
             await message.channel.send("🦢 HONK HONK! We have a winner!")
             await message.channel.send(f"Congratulations {message.author.mention}, you are now the holder of the Silly Goose! 🎉")
-            await self._show_leaderboard(message.channel)
+            
+            leaderboard = await self._show_leaderboard(message.channel)
+            await message.channel.send(
+                content="" if isinstance(leaderboard, discord.Embed) else leaderboard,
+                embed=leaderboard if isinstance(leaderboard, discord.Embed) else None
+            )
             
             self.current_count = -1
             self.target_number = self._generate_target()
@@ -204,7 +208,7 @@ class CountingGame(commands.Cog):
         
         self._save_game_state()
 
-    @app_commands.command(name="counting_new", description="Start a new counting game")
+    @app_commands.command(name="counting_new", description="Start a new counting game")        
     @app_commands.default_permissions(administrator=True)
     async def counting_new(self, interaction: discord.Interaction):
         """Start a new counting game."""
@@ -212,7 +216,6 @@ class CountingGame(commands.Cog):
         self.target_number = self._generate_target()
         self.last_counter = None
         self._save_game_state()
-        
         await interaction.response.send_message(
             "🎲 New counting game started! Begin at 0!"
         )
@@ -221,7 +224,11 @@ class CountingGame(commands.Cog):
     async def counting_leaderboard(self, interaction: discord.Interaction):
         """Display the leaderboard."""
         await interaction.response.defer()
-        await self._show_leaderboard(interaction.channel)
+        leaderboard = await self._show_leaderboard(interaction.channel)
+        await interaction.followup.send(
+            content="" if isinstance(leaderboard, discord.Embed) else leaderboard,
+            embed=leaderboard if isinstance(leaderboard, discord.Embed) else None
+        )
 
 async def setup(bot):
     await bot.add_cog(CountingGame(bot))
