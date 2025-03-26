@@ -72,6 +72,11 @@ class BGABot:
             # Load extensions and sync commands when bot is ready
             await self._load_extensions()
             taskService.processGames.start(self.bot)
+
+            # Send announcement to a specific channel
+            announcement_channel = self.bot.get_channel(self.config.counting_channel_id)
+            if announcement_channel:
+                await announcement_channel.send("🎮 BGA Bot is now online and ready to play!")
             
         try:
             await self.bot.start(self.config.discord_token)
