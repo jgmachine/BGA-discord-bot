@@ -31,6 +31,18 @@ class CountingGame(commands.Cog):
             gifs = [line.strip() for line in f if line.strip()]
         return random.choice(gifs)
 
+    def _get_random_goose_gif(self) -> str:
+        """Get a random GIF URL from the goose-gifs.txt file."""
+        gif_file = Path(__file__).parent.parent / "gifs" / "goose-gifs.txt"
+        with open(gif_file, 'r') as f:
+            gifs = [line.strip() for line in f if line.strip()]
+        return random.choice(gifs)
+
+    def _get_random_negative_emoji(self) -> str:
+        """Get a random negative emoji."""
+        negative_emojis = ['❌', '😢', '😭', '😔', '😪', '💔', '🤦', '😑', '😓', '🙅']
+        return random.choice(negative_emojis)
+
     async def announce_game_status(self):
         """Announce game status in counting channel."""
         if not self.counting_channel:
@@ -136,32 +148,34 @@ class CountingGame(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         """Monitor counting channel for numbers."""
-        # Skip if wrong channel or bot message
         if (message.channel.id != self.config.counting_channel_id or 
             message.author.bot):
             return
 
-        # Only process if message contains a number
         if not message.content.strip().isdigit():
             return
 
         number = int(message.content)
+        expected_number = self.current_count + 1  # This is the key change
         
-        if number != self.current_count:
-            await message.channel.send(f"❌ Wrong number! We're at {self.current_count}, so the next number should be {self.current_count}!")
+        if number != expected_number:
+            await message.add_reaction(self._get_random_negative_emoji())
+            await message.channel.send(f"❌ Wrong number! The next number should be {expected_number}.")
             return
             
         if message.author.id == self.last_counter:
+            await message.add_reaction(self._get_random_negative_emoji())
             await message.channel.send("❌ Wait for someone else to go!")
             return
 
-        # Valid number
         self.last_counter = message.author.id
+        self.current_count = number  # Update the count with the new number
         
         if number == self.target_number:
             self._record_win(message.author.id)
+            await message.channel.send(self._get_random_goose_gif())
             await message.channel.send("🦢 HONK HONK! We have a winner!")
-            await message.channel.send(f"Congratulations {message.author.mention}, you're today's Silly Goose! 🎉")
+            await message.channel.send(f"Congratulations {message.author.mention}, you are now the holder of the Silly Goose! 🎉")
             await self._show_leaderboard(message.channel)
             
             self.current_count = 0
@@ -169,8 +183,6 @@ class CountingGame(commands.Cog):
             self.last_counter = None
             await message.channel.send("New round starting! Begin at 0!")
         else:
-            self.current_count += 1
-            # Optional: React to confirm valid number
             await message.add_reaction("✅")
         
         self._save_game_state()
