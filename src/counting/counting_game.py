@@ -40,8 +40,8 @@ class CountingGame(commands.Cog):
                 return False
                 
         try:
+            await self.counting_channel.send(self._get_random_spawn_gif())
             await self.counting_channel.send(
-                f"{self._get_random_spawn_gif()}"
                 f"Last number counted: `{self.current_count}`"
             )
             logger.info("✅ Game status announced successfully")
