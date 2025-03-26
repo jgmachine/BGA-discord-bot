@@ -12,12 +12,15 @@ logger = logging.getLogger('counting_game')
 class CountingGame(commands.Cog):
     """Commands and logic for the counting game."""
     
+    # Class constant for target number range
+    TARGET_RANGE = (1, 10)  # Easier for testing - change to (1, 100) for production
+    
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.load()
         self.database = Database(self.config.database_path)
         self.current_count = 0
-        self.target_number = random.randint(1, 100)
+        self.target_number = None  # Initialize to None, let _load_game_state set it
         self.last_counter = None
         self.counting_channel = None
         self.ready = False
@@ -97,6 +100,10 @@ class CountingGame(commands.Cog):
             logger.error(f"❌ Failed to initialize counting game: {e}", exc_info=True)
             self.ready = False
 
+    def _generate_target(self):
+        """Generate a new target number using the configured range."""
+        return random.randint(*self.TARGET_RANGE)
+
     def _load_game_state(self):
         """Load game state from database."""
         state = self.database.get_game_state()
@@ -105,7 +112,7 @@ class CountingGame(commands.Cog):
         else:
             # Initialize game state
             self.current_count = 0
-            self.target_number = random.randint(1, 100)
+            self.target_number = self._generate_target()
             self.last_counter = None
             self._save_game_state()
 
@@ -160,12 +167,11 @@ class CountingGame(commands.Cog):
         
         if number != expected_number:
             await message.add_reaction(self._get_random_negative_emoji())
-            await message.channel.send(f"❌ Wrong number! The next number should be {expected_number}.")
+            await message.channel.send(f"❌ Wrong number! The last number counted was {self.current_count}.")
             return
             
         if message.author.id == self.last_counter:
             await message.add_reaction(self._get_random_negative_emoji())
-            await message.channel.send("❌ Wait for someone else to go!")
             return
 
         self.last_counter = message.author.id
@@ -179,7 +185,7 @@ class CountingGame(commands.Cog):
             await self._show_leaderboard(message.channel)
             
             self.current_count = 0
-            self.target_number = random.randint(1, 100)
+            self.target_number = self._generate_target()
             self.last_counter = None
             await message.channel.send("New round starting! Begin at 0!")
         else:
@@ -192,7 +198,7 @@ class CountingGame(commands.Cog):
     async def counting_new(self, interaction: discord.Interaction):
         """Start a new counting game."""
         self.current_count = 0
-        self.target_number = random.randint(1, 100)
+        self.target_number = self._generate_target()
         self.last_counter = None
         self._save_game_state()
         
