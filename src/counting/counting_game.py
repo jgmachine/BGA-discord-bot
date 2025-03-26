@@ -135,7 +135,7 @@ class CountingGame(commands.Cog):
         self.database.record_win(user_id)
 
     def _get_rank_info(self, wins):
-        """Get title and color based on win count."""
+        """Get title, color, and progress info based on win count."""
         ranks = [
             (100, "🔱 Legendary Goose", discord.Color.gold()),
             (50, "👑 Royal Goose", discord.Color.purple()),
@@ -143,16 +143,34 @@ class CountingGame(commands.Cog):
             (10, "🎖️ Elite Goose", discord.Color.green()),
             (0, "🥚 Gosling", discord.Color.light_grey())
         ]
-        for threshold, title, color in ranks:
+        
+        # Find current rank and next rank
+        current_rank = None
+        next_rank = None
+        
+        for i, (threshold, title, color) in enumerate(ranks):
             if wins >= threshold:
-                return title, color
-        return "🥚 Gosling", discord.Color.light_grey()
+                current_rank = (threshold, title, color)
+                next_rank = ranks[i-1] if i > 0 else None
+                break
+                
+        if current_rank is None:
+            return "🥚 Gosling", discord.Color.light_grey(), 0, 10
+            
+        current_threshold, current_title, current_color = current_rank
+        
+        if next_rank is None:  # At max rank
+            return current_title, current_color, 100, 100
+            
+        next_threshold = next_rank[0]
+        progress = (wins - current_threshold) / (next_threshold - current_threshold) * 100
+        
+        return current_title, current_color, progress, next_threshold
 
-    def _create_progress_bar(self, wins, max_wins=20):
+    def _create_progress_bar(self, wins, current_progress):
         """Create a visual progress bar using block elements."""
-        progress = min(wins / max_wins, 1.0)
         bar_length = 10
-        filled = int(bar_length * progress)
+        filled = int(bar_length * (current_progress / 100))
         empty = bar_length - filled
         return "█" * filled + "░" * empty
 
@@ -182,8 +200,8 @@ class CountingGame(commands.Cog):
             except discord.NotFound:
                 name = f"Unknown User ({user_id})"
 
-            title, _ = self._get_rank_info(wins)
-            progress_bar = self._create_progress_bar(wins)
+            title, _, progress, next_threshold = self._get_rank_info(wins)
+            progress_bar = self._create_progress_bar(wins, progress)
             
             # Format position with medal if in top 3
             position = f"{medals[i-1]} " if i <= 3 else f"#{i} "
@@ -194,7 +212,7 @@ class CountingGame(commands.Cog):
 
             value = (
                 f"**{title}**\n"
-                f"`{progress_bar}` {wins} {'win' if wins == 1 else 'wins'}\n"
+                f"`{progress_bar}` {wins}/{next_threshold} wins ({progress:.1f}%)\n"
                 f"{'🔥 On Fire!' if wins >= 3 else ''}"
             )
             
