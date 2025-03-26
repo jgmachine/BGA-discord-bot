@@ -73,7 +73,8 @@ class BGABot:
             taskService.processGames.start(self.bot)
             
             # Get the counting game cog and announce status
-            if counting_game = self.bot.get_cog('CountingGame'):
+            counting_game = self.bot.get_cog('CountingGame')
+            if counting_game:
                 await counting_game.announce_game_status()
             
         try:
