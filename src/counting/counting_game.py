@@ -182,7 +182,7 @@ class CountingGame(commands.Cog):
             return "No winners yet!"
 
         total_games = sum(wins for _, wins in leaders)
-        top_title, top_color = self._get_rank_info(leaders[0][1] if leaders else 0)
+        top_title, top_color, _, _ = self._get_rank_info(leaders[0][1] if leaders else 0)
 
         embed = discord.Embed(
             title="🦢 Silly Goose Championship Board",
