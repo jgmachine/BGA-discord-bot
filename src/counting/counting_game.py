@@ -134,6 +134,28 @@ class CountingGame(commands.Cog):
         """Record a win for the user."""
         self.database.record_win(user_id)
 
+    def _get_rank_info(self, wins):
+        """Get title and color based on win count."""
+        ranks = [
+            (100, "🔱 Legendary Goose", discord.Color.gold()),
+            (50, "👑 Royal Goose", discord.Color.purple()),
+            (25, "⚔️ Veteran Goose", discord.Color.blue()),
+            (10, "🎖️ Elite Goose", discord.Color.green()),
+            (0, "🥚 Gosling", discord.Color.light_grey())
+        ]
+        for threshold, title, color in ranks:
+            if wins >= threshold:
+                return title, color
+        return "🥚 Gosling", discord.Color.light_grey()
+
+    def _create_progress_bar(self, wins, max_wins=20):
+        """Create a visual progress bar using block elements."""
+        progress = min(wins / max_wins, 1.0)
+        bar_length = 10
+        filled = int(bar_length * progress)
+        empty = bar_length - filled
+        return "█" * filled + "░" * empty
+
     async def _show_leaderboard(self, channel):
         """Create and return the leaderboard embed."""
         leaders = self.database.get_leaderboard()
@@ -141,10 +163,17 @@ class CountingGame(commands.Cog):
         if not leaders:
             return "No winners yet!"
 
+        total_games = sum(wins for _, wins in leaders)
+        top_title, top_color = self._get_rank_info(leaders[0][1] if leaders else 0)
+
         embed = discord.Embed(
-            title="🦢 Silly Goose Leaderboard",
-            color=discord.Color.gold()
+            title="🦢 Silly Goose Championship Board",
+            description=f"Total Games Played: {total_games}\nCurrent Champion: {top_title}",
+            color=top_color
         )
+
+        # Medal emojis for top 3
+        medals = ["🥇", "🥈", "🥉"]
 
         for i, (user_id, wins) in enumerate(leaders, 1):
             try:
@@ -152,13 +181,30 @@ class CountingGame(commands.Cog):
                 name = user.name if user else f"Unknown User ({user_id})"
             except discord.NotFound:
                 name = f"Unknown User ({user_id})"
+
+            title, _ = self._get_rank_info(wins)
+            progress_bar = self._create_progress_bar(wins)
+            
+            # Format position with medal if in top 3
+            position = f"{medals[i-1]} " if i <= 3 else f"#{i} "
+            
+            # Special formatting for current winner
+            if i == 1:
+                name = f"👑 {name} 👑"
+
+            value = (
+                f"**{title}**\n"
+                f"`{progress_bar}` {wins} {'win' if wins == 1 else 'wins'}\n"
+                f"{'🔥 On Fire!' if wins >= 3 else ''}"
+            )
             
             embed.add_field(
-                name=f"#{i} {name}",
-                value=f"{wins} {'win' if wins == 1 else 'wins'}",
+                name=f"{position}{name}",
+                value=value,
                 inline=False
             )
 
+        embed.set_footer(text="🎯 Target: Get the most wins to become the Legendary Goose!")
         return embed
 
     @commands.Cog.listener()
