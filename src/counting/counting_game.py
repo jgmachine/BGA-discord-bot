@@ -31,6 +31,26 @@ class CountingGame(commands.Cog):
             gifs = [line.strip() for line in f if line.strip()]
         return random.choice(gifs)
 
+    async def announce_game_status(self):
+        """Announce game status in counting channel."""
+        if not self.counting_channel:
+            self.counting_channel = self.bot.get_channel(self.config.counting_channel_id)
+            if not self.counting_channel:
+                logger.error("❌ Could not find counting channel")
+                return False
+                
+        try:
+            await self.counting_channel.send(
+                f"🎲 **Counting Game is Ready!**\n"
+                f"Current count: `{self.current_count}`\n"
+                f"{self._get_random_spawn_gif()}"
+            )
+            logger.info("✅ Game status announced successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to announce game status: {e}")
+            return False
+
     @commands.Cog.listener()
     async def on_ready(self):
         """Handle initialization when bot is ready."""

@@ -72,6 +72,10 @@ class BGABot:
             await self._load_extensions()
             taskService.processGames.start(self.bot)
             
+            # Get the counting game cog and announce status
+            if counting_game = self.bot.get_cog('CountingGame'):
+                await counting_game.announce_game_status()
+            
         try:
             await self.bot.start(self.config.discord_token)
         except Exception as e:
