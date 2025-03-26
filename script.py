@@ -8,7 +8,6 @@ from src import taskService
 import asyncio
 from pathlib import Path
 from typing import Optional
-import random  # Add this import
 
 class BGABot:
     def __init__(self):
@@ -50,13 +49,6 @@ class BGABot:
             description="BGA Discord Bot with counting game"
         )
         
-    def _get_random_spawn_gif(self) -> str:
-        """Get a random GIF URL from the spawn-gifs.txt file."""
-        gif_file = Path(__file__).parent / "src" / "gifs" / "spawn-gifs.txt"
-        with open(gif_file, 'r') as f:
-            gifs = [line.strip() for line in f if line.strip()]
-        return random.choice(gifs)
-        
     async def _load_extensions(self) -> None:
         """Load bot command extensions."""
         try:
@@ -77,14 +69,8 @@ class BGABot:
         @self.bot.event
         async def on_ready():
             logging.info(f"✅ Logged in as {self.bot.user}")
-            # Load extensions and sync commands when bot is ready
             await self._load_extensions()
             taskService.processGames.start(self.bot)
-
-            # Send announcement with random GIF
-            announcement_channel = self.bot.get_channel(self.config.counting_channel_id)
-            if announcement_channel:
-                await announcement_channel.send(self._get_random_spawn_gif())
             
         try:
             await self.bot.start(self.config.discord_token)

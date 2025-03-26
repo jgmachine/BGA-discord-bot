@@ -5,6 +5,7 @@ from discord.ext import commands
 from discord import app_commands
 from src.database import Database
 from src.config import Config
+from pathlib import Path
 
 logger = logging.getLogger('counting_game')
 
@@ -22,6 +23,13 @@ class CountingGame(commands.Cog):
         self.ready = False
         self._load_game_state()
         logger.info(f"CountingGame initialized with channel ID: {self.config.counting_channel_id}")
+
+    def _get_random_spawn_gif(self) -> str:
+        """Get a random GIF URL from the spawn-gifs.txt file."""
+        gif_file = Path(__file__).parent.parent / "gifs" / "spawn-gifs.txt"
+        with open(gif_file, 'r') as f:
+            gifs = [line.strip() for line in f if line.strip()]
+        return random.choice(gifs)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -41,22 +49,22 @@ class CountingGame(commands.Cog):
 
             # Force reload game state after ensuring tables exist
             self._load_game_state()
-            
-            # Mark as ready and announce presence
             self.ready = True
             
-            startup_message = (
-                "🎲 **Counting Game Bot Online!**\n"
-                f"Current count: {self.current_count}\n"
-                f"Next number needed: {self.current_count}\n"
-                "Let's start counting!"
-            )
-            
-            await self.counting_channel.send(startup_message)
-            logger.info(f"✅ Counting game initialized in channel {self.counting_channel.name} ({self.counting_channel.id})")
+            # Send a single combined message with GIF
+            try:
+                await self.counting_channel.send(
+                    f"🎲 **Counting Game is Ready!**\n"
+                    f"Current count: `{self.current_count}`\n"
+                    f"{self._get_random_spawn_gif()}"
+                )
+                logger.info("✅ Counting game startup message sent successfully")
+            except Exception as e:
+                logger.error(f"Failed to send startup message: {e}")
             
         except Exception as e:
             logger.error(f"❌ Failed to initialize counting game: {e}", exc_info=True)
+            self.ready = False
 
     def _load_game_state(self):
         """Load game state from database."""
