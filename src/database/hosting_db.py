@@ -328,3 +328,12 @@ class HostingDatabase(BaseDatabase):
         except Exception as e:
             host_logger.error(f"Error resequencing positions: {e}")
             raise
+
+    def debug_schema(self):
+        """Debug method to print current table schema."""
+        try:
+            results = self._execute("PRAGMA table_info(hosting_rotation)")
+            columns = [(row[1], row[2]) for row in results]
+            host_logger.info(f"Current hosting_rotation schema: {columns}")
+        except Exception as e:
+            host_logger.error(f"Error getting schema: {e}")

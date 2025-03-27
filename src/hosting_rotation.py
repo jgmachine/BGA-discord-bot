@@ -293,9 +293,7 @@ class SecondaryHostCommands(commands.Cog):
         logger.info(f"🔄 Adding secondary host: {member.name}")
         
         try:
-            # Debug schema before operation
-            self.database.debug_schema()
-            
+            # Remove debug_schema call since we've confirmed schema is correct
             success = self.database.add_host(str(member.id), member.name, host_type_id=2)
             if success:
                 await interaction.response.send_message(
