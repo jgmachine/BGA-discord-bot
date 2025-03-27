@@ -3,8 +3,9 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import logging
 from datetime import datetime
-from ..database import events_db
-from ..config import Config
+from .database import events_db
+from .config import Config
+from .database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -12,17 +13,15 @@ def event_command():
     """Combined decorator for event commands."""
     def decorator(func):
         return app_commands.command()(
-            app_commands.guild_only()(
-                func  # Remove default_permissions to use Discord's integration settings
-            )
+            app_commands.guild_only()(func)
         )
     return decorator
 
 class EventCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.config = Config.load()  # Load config per instance
-        self.database = bot.database  # Use the database from the bot instance
+        self.config = Config.load()
+        self.database = Database(self.config.database_path)
         self.event_refresh.start()
 
     def cog_unload(self):
@@ -105,15 +104,5 @@ class EventCommands(commands.Cog):
             await events_db.update_all_events(self.database.conn)
 
 async def setup(bot):
-    # Create and add the cog first
-    cog = EventCommands(bot)
-    await bot.add_cog(cog)
-    
-    # Then try to sync the commands
-    try:
-        synced = await bot.tree.sync()
-        logger.info(f"✅ {len(synced)} Event commands synced successfully")
-    except Exception as e:
-        logger.error(f"❌ Failed to sync event commands: {e}")
-    else:
-        logger.info("✅ Event commands loaded")
+    await bot.add_cog(EventCommands(bot))
+    logger.info("✅ Event commands loaded")
