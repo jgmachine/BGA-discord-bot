@@ -34,35 +34,52 @@ class HostingDatabase(BaseDatabase):
             ''')
             host_logger.info("Created new hosting_rotation table")
         else:
-            # Add any missing columns
-            needed_columns = {
-                'venue_position': 'INTEGER',
-                'game_position': 'INTEGER',
-                'last_venue_hosted': 'DATE',
-                'last_game_hosted': 'DATE',
-                'venue_active': 'INTEGER DEFAULT 0',
-                'game_active': 'INTEGER DEFAULT 0'
-            }
-            
-            for col_name, col_type in needed_columns.items():
-                if col_name not in existing_columns:
-                    self._execute(f'ALTER TABLE hosting_rotation ADD COLUMN {col_name} {col_type}')
-                    host_logger.info(f"Added column {col_name} to hosting_rotation table")
-            
-            # If we're migrating from the old schema, convert existing data
             if 'order_position' in existing_columns:
-                host_logger.info("Migrating from old schema...")
-                # Copy order_position to venue_position and set venue_active for existing hosts
+                # Create temporary table with new schema
                 self._execute('''
-                    UPDATE hosting_rotation 
-                    SET venue_position = order_position,
-                        venue_active = active
-                    WHERE order_position IS NOT NULL
+                    CREATE TABLE hosting_rotation_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        discord_id TEXT NOT NULL,
+                        username TEXT NOT NULL,
+                        venue_position INTEGER,
+                        game_position INTEGER,
+                        last_venue_hosted DATE,
+                        last_game_hosted DATE,
+                        venue_active INTEGER DEFAULT 0,
+                        game_active INTEGER DEFAULT 0
+                    )
                 ''')
                 
-                # Consider dropping old columns if needed
-                # self._execute('ALTER TABLE hosting_rotation DROP COLUMN order_position')
-                # self._execute('ALTER TABLE hosting_rotation DROP COLUMN active')
+                # Copy data from old table to new table
+                self._execute('''
+                    INSERT INTO hosting_rotation_new (
+                        discord_id, username, venue_position, venue_active
+                    )
+                    SELECT 
+                        discord_id, username, order_position, active
+                    FROM hosting_rotation
+                ''')
+                
+                # Drop old table and rename new one
+                self._execute('DROP TABLE hosting_rotation')
+                self._execute('ALTER TABLE hosting_rotation_new RENAME TO hosting_rotation')
+                
+                host_logger.info("Successfully migrated to new schema")
+            else:
+                # Add any missing columns
+                needed_columns = {
+                    'venue_position': 'INTEGER',
+                    'game_position': 'INTEGER',
+                    'last_venue_hosted': 'DATE',
+                    'last_game_hosted': 'DATE',
+                    'venue_active': 'INTEGER DEFAULT 0',
+                    'game_active': 'INTEGER DEFAULT 0'
+                }
+                
+                for col_name, col_type in needed_columns.items():
+                    if col_name not in existing_columns:
+                        self._execute(f'ALTER TABLE hosting_rotation ADD COLUMN {col_name} {col_type}')
+                        host_logger.info(f"Added column {col_name} to hosting_rotation table")
         
         host_logger.info("Hosting rotation tables checked/updated successfully")
 
