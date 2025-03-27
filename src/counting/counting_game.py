@@ -18,7 +18,7 @@ class CountingGame(commands.Cog):
         self.database = Database(self.config.database_path)
         
         # Set target range from config
-        self.target_range = (1, self.config.target_max)
+        self.target_range = (0, self.config.target_max)
         
         # Initialize database tables immediately
         logger.info("Creating database tables...")
