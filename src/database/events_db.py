@@ -68,6 +68,16 @@ async def update_all_events(conn):
     for (url,) in cursor.fetchall():
         await update_event(conn, url)
 
+def _row_to_dict(row):
+    """Convert a sqlite3.Row to a dictionary with proper datetime conversion."""
+    if not row:
+        return None
+    data = dict(zip([col[0] for col in row.description], row))
+    # Convert string dates back to datetime objects
+    if 'date' in data and isinstance(data['date'], str):
+        data['date'] = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
+    return data
+
 def get_next_event(conn):
     """Get the next upcoming event."""
     now = datetime.utcnow()
@@ -77,9 +87,13 @@ def get_next_event(conn):
         ORDER BY date ASC 
         LIMIT 1
     ''', (now,))
-    return cursor.fetchone()
+    cursor.row_factory = sqlite3.Row
+    row = cursor.fetchone()
+    return _row_to_dict(row)
 
 def get_all_events(conn):
     """Get all tracked events."""
     cursor = conn.execute('SELECT * FROM events ORDER BY date ASC')
-    return cursor.fetchall()
+    cursor.row_factory = sqlite3.Row
+    rows = cursor.fetchall()
+    return [_row_to_dict(row) for row in rows]
