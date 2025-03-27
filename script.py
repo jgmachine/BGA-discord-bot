@@ -54,8 +54,8 @@ class BGABot:
         try:
             await self.bot.load_extension("src.hosting_rotation")
             await self.bot.load_extension("src.bga_commands")
-            await self.bot.load_extension("src.counting.counting_game")  # Add this line
-            # Sync commands globally after loading extensions
+            await self.bot.load_extension("src.counting.counting_game")
+            await self.bot.load_extension("src.events")  # Updated path
             await self.bot.tree.sync()
             logging.info("✅ Extensions loaded and commands synced successfully.")
         except Exception as e:
