@@ -47,16 +47,32 @@ async def update_event(conn, url):
     try:
         event = await webscraper.scrape_aftergame_event(url)
         if event:
-            with conn:  # Use context manager for transaction
+            # Convert date to UTC for storage if it has timezone info
+            event_date = event['date']
+            if isinstance(event_date, datetime):
+                if event_date.tzinfo is None:
+                    # If no timezone, assume Pacific and convert to UTC
+                    event_date = event_date.replace(tzinfo=ZoneInfo('America/Los_Angeles')).astimezone(ZoneInfo('UTC'))
+                else:
+                    # If has timezone, convert to UTC
+                    event_date = event_date.astimezone(ZoneInfo('UTC'))
+
+            with conn:
                 conn.execute('''
                     UPDATE events 
                     SET name=?, date=?, venue=?, address=?, going_count=?, 
                         description=?, image_url=?, last_updated=?
                     WHERE url=?
                 ''', (
-                    event['name'], event['date'], event['venue'], event['address'],
-                    event['going_count'], event['description'], event['image_url'],
-                    datetime.utcnow(), url
+                    event['name'], 
+                    event_date.strftime('%Y-%m-%d %H:%M:%S'),  # Store as UTC string
+                    event['venue'], 
+                    event['address'],
+                    event['going_count'], 
+                    event['description'], 
+                    event['image_url'],
+                    datetime.now(ZoneInfo('UTC')), 
+                    url
                 ))
                 return True
     except Exception as e:
@@ -76,14 +92,16 @@ def _row_to_dict(row):
     data = {key: row[key] for key in row.keys()}
     # Convert string dates to datetime objects with proper timezone
     if 'date' in data and data['date']:
-        if isinstance(data['date'], str):
-            # Parse UTC time from database
-            dt = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
+        try:
+            # Parse as naive datetime first
+            naive_dt = datetime.strptime(data['date'], '%Y-%m-%d %H:%M:%S')
+            # Assign UTC timezone
+            utc_dt = naive_dt.replace(tzinfo=ZoneInfo('UTC'))
             # Convert to Pacific time
-            data['date'] = dt.astimezone(ZoneInfo('America/Los_Angeles'))
-        elif isinstance(data['date'], datetime) and data['date'].tzinfo is None:
-            # If datetime has no timezone, assume UTC and convert to Pacific
-            data['date'] = data['date'].replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('America/Los_Angeles'))
+            data['date'] = utc_dt.astimezone(ZoneInfo('America/Los_Angeles'))
+        except (ValueError, TypeError):
+            logging.error(f"Failed to parse date: {data['date']}")
+            data['date'] = None
     return data
 
 def get_next_event(conn):
