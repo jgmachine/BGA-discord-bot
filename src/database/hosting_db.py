@@ -324,6 +324,73 @@ class HostingDatabase(BaseDatabase):
             host_logger.error(f"Error resequencing positions: {e}")
             raise
 
+    def move_host(self, discord_id, position_type, host_type_id=1):
+        """Move a host to a new position in their rotation."""
+        position_field = "venue_position" if host_type_id == 1 else "game_position"
+        active_field = "venue_active" if host_type_id == 1 else "game_active"
+        
+        try:
+            # Get current host info
+            results = self._execute(
+                f"SELECT username, {position_field} FROM hosting_rotation WHERE discord_id=? AND {active_field}=1",
+                (discord_id,)
+            )
+            
+            if not results:
+                return "Host not found or not active"
+            
+            username, current_pos = results[0]
+            
+            if position_type == "top":
+                # Move everyone else down one
+                self._execute(
+                    f"UPDATE hosting_rotation SET {position_field} = {position_field} + 1 WHERE {active_field}=1"
+                )
+                # Move target host to top
+                self._execute(
+                    f"UPDATE hosting_rotation SET {position_field} = 1 WHERE discord_id = ?",
+                    (discord_id,)
+                )
+                msg = f"{username} has been moved to the top of the list!"
+                
+            elif position_type == "bottom":
+                # Get max position
+                results = self._execute(
+                    f"SELECT MAX({position_field}) FROM hosting_rotation WHERE {active_field}=1"
+                )
+                max_pos = results[0][0] if results and results[0][0] is not None else 0
+                
+                # Move others up
+                self._execute(
+                    f"UPDATE hosting_rotation SET {position_field} = {position_field} - 1 WHERE {position_field} > ? AND {active_field}=1",
+                    (current_pos,)
+                )
+                # Move target host to bottom
+                self._execute(
+                    f"UPDATE hosting_rotation SET {position_field} = ? WHERE discord_id = ?",
+                    (max_pos, discord_id)
+                )
+                msg = f"{username} has been moved to the bottom of the list!"
+                
+            else:  # next
+                # Move to position 2 (right after current host)
+                self._execute(
+                    f"UPDATE hosting_rotation SET {position_field} = {position_field} + 1 WHERE {position_field} > 1 AND {active_field}=1"
+                )
+                self._execute(
+                    f"UPDATE hosting_rotation SET {position_field} = 2 WHERE discord_id = ?",
+                    (discord_id,)
+                )
+                msg = f"{username} will host next!"
+            
+            # Resequence to ensure no gaps
+            self._resequence_positions(host_type_id)
+            return msg
+            
+        except Exception as e:
+            host_logger.error(f"Error moving host: {e}")
+            raise
+
     def debug_schema(self):
         """Debug method to print current table schema."""
         try:

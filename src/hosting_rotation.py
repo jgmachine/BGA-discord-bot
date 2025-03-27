@@ -86,67 +86,17 @@ class HostingRotationCommands(commands.Cog):
             logger.warning("⚠️ No active hosts found.")
 
     @host_command()
-    @app_commands.describe(
-        member="The user to move",
-        position="Where to move them (top/bottom/next)",
-    )
-    @app_commands.choices(position=[
-        app_commands.Choice(name="Top of list", value="top"),
-        app_commands.Choice(name="Bottom of list", value="bottom"),
-        app_commands.Choice(name="Next in line", value="next")
-    ])
     async def host_move(self, interaction: discord.Interaction, member: discord.Member, position: app_commands.Choice[str]):
         """Move a host to a specific position"""
         logger.info(f"🔄 Received command: /host_move {member.name} to {position.value}")
         
         try:
-            database.connect()
-            cursor = database.cursor
-            
-            # Verify host exists and is active
-            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=?", (str(member.id),))
-            host = cursor.fetchone()
-            if not host:
-                await interaction.response.send_message(f"❌ {member.name} is not in the host list.")
-                return
-                
-            username, current_pos = host
-            
-            if position.value == "top":
-                # Move everyone else down one
-                cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1")
-                # Move target host to top
-                cursor.execute("UPDATE hosting_rotation SET order_position = 1 WHERE discord_id = ?", (str(member.id),))
-                msg = f"✅ {username} has been moved to the top of the list!"
-                
-            elif position.value == "bottom":
-                # Get max position
-                cursor.execute("SELECT MAX(order_position) FROM hosting_rotation")
-                max_pos = cursor.fetchone()[0]
-                # Move others up if needed
-                cursor.execute("UPDATE hosting_rotation SET order_position = order_position - 1 WHERE order_position > ?", 
-                             (current_pos,))
-                # Move target host to bottom
-                cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
-                             (max_pos, str(member.id),))
-                msg = f"✅ {username} has been moved to the bottom of the list!"
-                
-            else:  # next
-                # Move to position 2 (right after current host)
-                cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1 WHERE order_position > 1")
-                cursor.execute("UPDATE hosting_rotation SET order_position = 2 WHERE discord_id = ?", (str(member.id),))
-                msg = f"✅ {username} will host next!"
-            
-            database.conn.commit()
-            await interaction.response.send_message(msg)
-            logger.info(f"✅ Successfully moved {username} to {position.value}")
-            
+            result = self.database.move_host(str(member.id), position.value, host_type_id=1)
+            await interaction.response.send_message(f"✅ {result}")
+            logger.info(f"✅ Successfully moved {member.name} to {position.value}")
         except Exception as e:
             logger.error(f"Error moving host: {e}")
-            database.conn.rollback()
             await interaction.response.send_message("❌ An error occurred while processing this command.")
-        finally:
-            database.close()
 
     @host_command()
     @app_commands.describe(first="First host", second="Second host")
@@ -398,12 +348,12 @@ class SecondaryHostCommands(commands.Cog):
     ])
     async def host2_move(self, interaction: discord.Interaction, member: discord.Member, position: app_commands.Choice[str]):
         """Move a game host to a specific position"""
-        # Similar to host_move but use game_position and game_active fields
-        # Implementation follows same pattern as host_move with host_type_id=2
+        logger.info(f"🔄 Received command: /host2_move {member.name} to {position.value}")
+        
         try:
-            # Moving game host logic here
             result = self.database.move_host(str(member.id), position.value, host_type_id=2)
-            await interaction.response.send_message(result)
+            await interaction.response.send_message(f"✅ {result}")
+            logger.info(f"✅ Successfully moved {member.name} to {position.value}")
         except Exception as e:
             logger.error(f"Error moving game host: {e}")
             await interaction.response.send_message("❌ An error occurred while moving the game host.")
