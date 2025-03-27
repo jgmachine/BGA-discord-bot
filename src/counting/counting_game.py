@@ -49,7 +49,12 @@ class CountingGame(commands.Cog):
 
     def _get_random_negative_emoji(self) -> str:
         """Get a random negative emoji."""
-        negative_emojis = ['❌', '😢', '😭', '😔', '😪', '💔', '🤦', '😑', '😓', '🙅']
+        negative_emojis = [
+            '❌', '😢', '😭', '😔', '😪', '💔', '🤦', '😑', '😓', '🙅',  # original ones
+            '🤡', '🐍', '🤪', '🫠', '🫣', '🤨', '🦨', '💩',  # silly/funny ones
+            '🫥', '🥴', '🤕', '😵‍💫', '🫨', '🤌', '🗿',     # goofy/dizzy ones
+            '⚰️', '🎪', '🌚', '🤓', '👻', '🦆'              # chaotic ones
+        ]
         return random.choice(negative_emojis)
 
     async def announce_game_status(self):
@@ -237,15 +242,27 @@ class CountingGame(commands.Cog):
 
         number = int(message.content)
         expected_number = self.current_count + 1
-        
+
+        # Special handling for new game start
+        if self.current_count == -1:
+            if number != 0:
+                await message.add_reaction(self._get_random_negative_emoji())
+                await message.channel.send("❌ New round! Please start counting from 0.")
+                return
+            # Reset last_counter when first valid number (0) is entered
+            self.last_counter = None
+            
         if number != expected_number:
             await message.add_reaction(self._get_random_negative_emoji())
-            await message.channel.send(f"❌ Wrong number! The last number counted was {self.current_count}.")
+            if self.current_count == -1:
+                await message.channel.send("❌ New round! Please start counting from 0.")
+            else:
+                await message.channel.send(f"❌ Wrong number! The last number counted was {self.current_count}.")
             return
             
         if message.author.id == self.last_counter:
             await message.add_reaction(self._get_random_negative_emoji())
-            await message.channel.send(f"❌ Wait your turn!.")
+            await message.channel.send("❌ Wait your turn!")
             return
 
         self.last_counter = message.author.id
@@ -265,7 +282,7 @@ class CountingGame(commands.Cog):
             
             self.current_count = -1
             self.target_number = self._generate_target()
-            self.last_counter = None
+            # Don't reset last_counter here anymore, wait until first valid number
             await message.channel.send("New round starting! I'm a computer, so start at 0!")
         else:
             await message.add_reaction("✅")
