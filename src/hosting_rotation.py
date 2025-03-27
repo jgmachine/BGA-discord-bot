@@ -235,47 +235,41 @@ class HostingRotationCommands(commands.Cog):
         logger.info("🔄 Received command: /host_help")
         
         embed = discord.Embed(
-            title="🎲 Host List Commands",
-            description="Here are all the commands available for managing the game host list:",
+            title="🎲 Hosting Commands",
+            description="Commands for managing both venue and game host rotations:",
             color=discord.Color.blue()
         )
         
         embed.add_field(
-            name="📋 View Commands",
+            name="📋 Venue Host Commands",
             value=(
-                "**/host_next** - Shows who's next in the list\n"
-                "**/host_list** - Displays the complete host order"
+                "**/host_next** - Shows who's next to host venue\n"
+                "**/host_list** - Shows venue host rotation\n"
+                "**/host_rotate** - Moves current venue host to bottom\n"
+                "**/host_move @user [top/bottom/next]** - Move venue host position\n"
+                "**/host_swap @user1 @user2** - Swap venue hosts\n"
+                "**/host_add @user** - Add venue host\n"
+                "**/host_remove @user** - Remove venue host"
             ),
             inline=False
         )
         
         embed.add_field(
-            name="🔄 List Management",
+            name="🎲 Game Host Commands",
             value=(
-                "**/host_rotate** - Moves current host to the bottom\n"
-                "**/host_move @user [top/bottom/next]** - Move a host to a specific position\n"
-                "**/host_swap @user1 @user2** - Swaps the positions of two hosts"
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="👤 User Management",
-            value=(
-                "**/host_add @user** - Adds a new user to the list\n"
-                "**/host_remove @user** - Removes a user from the list"
+                "**/host2_next** - Shows who's next to host game\n"
+                "**/host2_list** - Shows game host rotation\n"
+                "**/host2_rotate** - Moves current game host to bottom\n"
+                "**/host2_move @user [top/bottom/next]** - Move game host position\n"
+                "**/host2_add @user** - Add game host\n"
+                "**/host2_remove @user** - Remove game host"
             ),
             inline=False
         )
         
         embed.set_footer(text="Commands must be used in the designated channel")
-        
         await interaction.response.send_message(embed=embed)
-        
-        embed.set_footer(text="Commands must be used in the designated channel")
-        
-        await interaction.response.send_message(embed=embed)
-        logger.info("✅ Displayed host help information")
+        logger.info("✅ Displayed hosting help information")
 
 class SecondaryHostCommands(commands.Cog):
     """Commands for managing the secondary game hosts."""
@@ -381,44 +375,6 @@ class SecondaryHostCommands(commands.Cog):
         except Exception as e:
             logger.error(f"Error moving game host: {e}")
             await interaction.response.send_message("❌ An error occurred while moving the game host.")
-
-    @host_command()
-    async def host2_help(self, interaction: discord.Interaction):
-        """Shows help information for all game host commands"""
-        embed = discord.Embed(
-            title="🎲 Game Host Commands",
-            description="Commands for managing the secondary game host rotation:",
-            color=discord.Color.green()
-        )
-        
-        embed.add_field(
-            name="📋 View Commands",
-            value=(
-                "**/host2_next** - Shows who's next to host a game\n"
-                "**/host2_list** - Displays the complete game host order"
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="🔄 List Management",
-            value=(
-                "**/host2_rotate** - Moves current game host to the bottom\n"
-                "**/host2_move @user [top/bottom/next]** - Move a game host's position"
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="👤 User Management",
-            value=(
-                "**/host2_add @user** - Adds a new game host\n"
-                "**/host2_remove @user** - Removes a game host"
-            ),
-            inline=False
-        )
-        
-        await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(HostingRotationCommands(bot))
