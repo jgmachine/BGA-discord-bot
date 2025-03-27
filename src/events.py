@@ -63,7 +63,7 @@ class EventCommands(commands.Cog):
         embed = discord.Embed(title="Tracked Events", color=discord.Color.blue())
         for event in events:
             embed.add_field(
-                name=f"{event['name']} - {event['date'].strftime('%Y-%m-%d %H:%M')}",
+                name=f"{event['name']} - {event['date'].strftime('%A, %B %d at %I:%M %p %Z')}",
                 value=f"Venue: {event['venue']}\nGoing: {event['going_count']}\n[Link]({event['url']})",
                 inline=False
             )
@@ -82,7 +82,10 @@ class EventCommands(commands.Cog):
             url=event['url'],
             color=discord.Color.blue()
         )
-        embed.add_field(name="Date", value=event['date'].strftime('%Y-%m-%d %H:%M'))
+        embed.add_field(
+            name="Date", 
+            value=event['date'].strftime('%A, %B %d at %I:%M %p %Z')
+        )
         if event['venue']:
             embed.add_field(name="Venue", value=event['venue'])
         if event['address']:
