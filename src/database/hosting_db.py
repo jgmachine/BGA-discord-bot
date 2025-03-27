@@ -28,22 +28,40 @@ class HostingDatabase(BaseDatabase):
             (1, 'venue', 'Primary venue/house host'),
             (2, 'game', 'Secondary game table host')
         ''')
+
+        # Check if hosting_rotation table exists and get its columns
+        results = self._execute("PRAGMA table_info(hosting_rotation)")
+        existing_columns = [row[1] for row in results] if results else []
         
-        # Modify hosting_rotation table to include host_type
-        self._execute('''
-            CREATE TABLE IF NOT EXISTS hosting_rotation (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                discord_id TEXT NOT NULL,
-                username TEXT NOT NULL,
-                order_position INTEGER NOT NULL,
-                last_hosted DATE,
-                active INTEGER DEFAULT 1,
-                host_type_id INTEGER DEFAULT 1,
-                UNIQUE(discord_id, host_type_id),
-                FOREIGN KEY(host_type_id) REFERENCES hosting_types(id)
-            )
-        ''')
-        host_logger.info("Hosting rotation tables created or already exist")
+        if not existing_columns:
+            # Create new table if it doesn't exist
+            self._execute('''
+                CREATE TABLE hosting_rotation (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    discord_id TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    order_position INTEGER NOT NULL,
+                    last_hosted DATE,
+                    active INTEGER DEFAULT 1,
+                    host_type_id INTEGER DEFAULT 1,
+                    UNIQUE(discord_id, host_type_id),
+                    FOREIGN KEY(host_type_id) REFERENCES hosting_types(id)
+                )
+            ''')
+        elif 'host_type_id' not in existing_columns:
+            # Add host_type_id column to existing table
+            host_logger.info("Adding host_type_id column to existing hosting_rotation table")
+            self._execute('''
+                ALTER TABLE hosting_rotation 
+                ADD COLUMN host_type_id INTEGER DEFAULT 1
+            ''')
+            # Add unique constraint
+            self._execute('''
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_discord_host_type 
+                ON hosting_rotation(discord_id, host_type_id)
+            ''')
+
+        host_logger.info("Hosting rotation tables created/updated successfully")
 
     def add_host(self, discord_id, username, host_type_id=1):
         """Adds a user to the specified hosting rotation."""
