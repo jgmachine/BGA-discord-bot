@@ -2,6 +2,7 @@ import sqlite3
 from datetime import datetime
 import logging
 from .. import webscraper
+from zoneinfo import ZoneInfo
 
 def setup_events_table(conn):
     """Create the events table if it doesn't exist."""
@@ -72,11 +73,17 @@ def _row_to_dict(row):
     """Convert a sqlite3.Row to a dictionary with proper datetime conversion."""
     if not row:
         return None
-    # Convert Row to dict using the row.keys() method
     data = {key: row[key] for key in row.keys()}
-    # Convert string dates back to datetime objects
-    if 'date' in data and isinstance(data['date'], str):
-        data['date'] = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
+    # Convert string dates to datetime objects with proper timezone
+    if 'date' in data and data['date']:
+        if isinstance(data['date'], str):
+            # Parse UTC time from database
+            dt = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
+            # Convert to Pacific time
+            data['date'] = dt.astimezone(ZoneInfo('America/Los_Angeles'))
+        elif isinstance(data['date'], datetime) and data['date'].tzinfo is None:
+            # If datetime has no timezone, assume UTC and convert to Pacific
+            data['date'] = data['date'].replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('America/Los_Angeles'))
     return data
 
 def get_next_event(conn):
