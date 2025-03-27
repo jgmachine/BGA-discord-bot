@@ -1,8 +1,19 @@
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+import logging
 from datetime import datetime
 from ..database import events_db
+
+def event_command():
+    """Combined decorator for event commands."""
+    def decorator(func):
+        return app_commands.command()(
+            app_commands.guild_only()(
+                func  # Remove default_permissions to use Discord's integration settings
+            )
+        )
+    return decorator
 
 class EventCommands(commands.Cog):
     def __init__(self, bot):
@@ -12,8 +23,8 @@ class EventCommands(commands.Cog):
     def cog_unload(self):
         self.event_refresh.cancel()
 
-    @app_commands.command(name="event_add")
-    @app_commands.default_permissions(administrator=True)
+    @event_command()
+    @app_commands.describe(url="The Aftergame event URL to track")
     async def event_add(self, interaction: discord.Interaction, url: str):
         """Add an Aftergame event URL to track"""
         if 'aftergame.co/events/' not in url:
@@ -26,8 +37,8 @@ class EventCommands(commands.Cog):
         else:
             await interaction.response.send_message('Failed to add event.')
 
-    @app_commands.command(name="event_remove")
-    @app_commands.default_permissions(administrator=True)
+    @event_command()
+    @app_commands.describe(url="The Aftergame event URL to remove")
     async def event_remove(self, interaction: discord.Interaction, url: str):
         """Remove an Aftergame event URL from tracking"""
         if events_db.remove_event(self.bot.db_conn, url):
@@ -35,7 +46,7 @@ class EventCommands(commands.Cog):
         else:
             await interaction.response.send_message('Failed to remove event.')
 
-    @app_commands.command(name="event_list")
+    @event_command()
     async def event_list(self, interaction: discord.Interaction):
         """List all tracked events"""
         events = events_db.get_all_events(self.bot.db_conn)
@@ -52,7 +63,7 @@ class EventCommands(commands.Cog):
             )
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="event_next")
+    @event_command()
     async def event_next(self, interaction: discord.Interaction):
         """Show the next upcoming event"""
         event = events_db.get_next_event(self.bot.db_conn)
@@ -75,8 +86,7 @@ class EventCommands(commands.Cog):
             embed.set_image(url=event['image_url'])
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="event_refresh")
-    @app_commands.default_permissions(administrator=True)
+    @event_command()
     async def event_refresh(self, interaction: discord.Interaction):
         """Manually refresh event data"""
         await interaction.response.send_message('Refreshing event data...')
@@ -90,4 +100,10 @@ class EventCommands(commands.Cog):
             await events_db.update_all_events(self.bot.db_conn)
 
 async def setup(bot):
-    await bot.add_cog(EventCommands(bot))
+    cog = EventCommands(bot)
+    await bot.add_cog(cog)
+    try:
+        await bot.tree.sync()
+        logging.info("Event commands synced successfully")
+    except Exception as e:
+        logging.error(f"Failed to sync event commands: {e}")
