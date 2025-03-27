@@ -86,6 +86,15 @@ class HostingRotationCommands(commands.Cog):
             logger.warning("⚠️ No active hosts found.")
 
     @host_command()
+    @app_commands.describe(
+        member="The user to move",
+        position="Where to move them (top/bottom/next)",
+    )
+    @app_commands.choices(position=[
+        app_commands.Choice(name="Top of list", value="top"),
+        app_commands.Choice(name="Bottom of list", value="bottom"),
+        app_commands.Choice(name="Next in line", value="next")
+    ])
     async def host_move(self, interaction: discord.Interaction, member: discord.Member, position: app_commands.Choice[str]):
         """Move a host to a specific position"""
         logger.info(f"🔄 Received command: /host_move {member.name} to {position.value}")
