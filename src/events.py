@@ -102,7 +102,7 @@ class EventCommands(commands.Cog):
         await events_db.update_all_events(self.database.conn)
         await interaction.followup.send('Event data refreshed.')
 
-    @tasks.loop(hours=1)
+    @tasks.loop(minutes=15)
     async def event_refresh(self):
         """Automatically refresh event data periodically"""
         if self.database and self.database.conn:
