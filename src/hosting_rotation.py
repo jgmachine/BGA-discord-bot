@@ -277,6 +277,41 @@ class HostingRotationCommands(commands.Cog):
         await interaction.response.send_message(embed=embed)
         logger.info("✅ Displayed host help information")
 
+class SecondaryHostCommands(commands.Cog):
+    """Commands for managing the secondary game hosts."""
+    
+    def __init__(self, bot):
+        self.bot = bot
+        self.config = Config.load()
+        self.database = Database(self.config.database_path)
+        self.hosting_rotation_channel_id = self.config.hosting_rotation_channel_id
+
+    @host_command()
+    @app_commands.describe(member="The user to add to the game host list")
+    async def host2_add(self, interaction: discord.Interaction, member: discord.Member):
+        """Adds a user to the secondary game host list"""
+        logger.info(f"🔄 Adding secondary host: {member.name}")
+        
+        self.database.add_host(str(member.id), member.name, host_type_id=2)
+        await interaction.response.send_message(
+            f"✅ {member.name} has been added to the game host list!"
+        )
+
+    @host_command()
+    async def host2_next(self, interaction: discord.Interaction):
+        """Shows who's next in the secondary host list"""
+        host = self.database.get_next_host(host_type_id=2)
+        if host:
+            await interaction.response.send_message(
+                f"🎲 The next game host is: **{host['username']}**"
+            )
+        else:
+            await interaction.response.send_message("❌ No active game hosts found.")
+
+    # Add other commands following same pattern: host2_remove, host2_move, etc.
+    # ... implement remaining commands ...
+
 async def setup(bot):
     await bot.add_cog(HostingRotationCommands(bot))
-    logger.info("✅ HostingRotationCommands cog has been loaded")
+    await bot.add_cog(SecondaryHostCommands(bot))
+    logger.info("✅ Hosting rotation commands loaded")
