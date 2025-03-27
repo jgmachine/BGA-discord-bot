@@ -5,6 +5,8 @@ import logging
 from datetime import datetime
 from ..database import events_db
 
+logger = logging.getLogger(__name__)
+
 def event_command():
     """Combined decorator for event commands."""
     def decorator(func):
@@ -100,10 +102,15 @@ class EventCommands(commands.Cog):
             await events_db.update_all_events(self.bot.db_conn)
 
 async def setup(bot):
+    # Create and add the cog first
     cog = EventCommands(bot)
     await bot.add_cog(cog)
+    
+    # Then try to sync the commands
     try:
-        await bot.tree.sync()
-        logging.info("Event commands synced successfully")
+        synced = await bot.tree.sync()
+        logger.info(f"✅ {len(synced)} Event commands synced successfully")
     except Exception as e:
-        logging.error(f"Failed to sync event commands: {e}")
+        logger.error(f"❌ Failed to sync event commands: {e}")
+    else:
+        logger.info("✅ Event commands loaded")
