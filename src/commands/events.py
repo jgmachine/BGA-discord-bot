@@ -4,6 +4,7 @@ from discord.ext import commands, tasks
 import logging
 from datetime import datetime
 from ..database import events_db
+from ..config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,8 @@ def event_command():
 class EventCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.config = Config.load()  # Load config per instance
+        self.database = bot.database  # Use the database from the bot instance
         self.event_refresh.start()
 
     def cog_unload(self):
@@ -33,8 +36,8 @@ class EventCommands(commands.Cog):
             await interaction.response.send_message('Please provide a valid Aftergame event URL.')
             return
             
-        if events_db.add_event(self.bot.database.conn, url):
-            await events_db.update_event(self.bot.database.conn, url)
+        if events_db.add_event(self.database.conn, url):
+            await events_db.update_event(self.database.conn, url)
             await interaction.response.send_message('Event added and data updated.')
         else:
             await interaction.response.send_message('Failed to add event.')
@@ -43,7 +46,7 @@ class EventCommands(commands.Cog):
     @app_commands.describe(url="The Aftergame event URL to remove")
     async def event_remove(self, interaction: discord.Interaction, url: str):
         """Remove an Aftergame event URL from tracking"""
-        if events_db.remove_event(self.bot.database.conn, url):
+        if events_db.remove_event(self.database.conn, url):
             await interaction.response.send_message('Event removed.')
         else:
             await interaction.response.send_message('Failed to remove event.')
@@ -51,7 +54,7 @@ class EventCommands(commands.Cog):
     @event_command()
     async def event_list(self, interaction: discord.Interaction):
         """List all tracked events"""
-        events = events_db.get_all_events(self.bot.database.conn)
+        events = events_db.get_all_events(self.database.conn)
         if not events:
             await interaction.response.send_message('No events are being tracked.')
             return
@@ -68,7 +71,7 @@ class EventCommands(commands.Cog):
     @event_command()
     async def event_next(self, interaction: discord.Interaction):
         """Show the next upcoming event"""
-        event = events_db.get_next_event(self.bot.database.conn)
+        event = events_db.get_next_event(self.database.conn)
         if not event:
             await interaction.response.send_message('No upcoming events found.')
             return
@@ -92,14 +95,14 @@ class EventCommands(commands.Cog):
     async def event_refresh(self, interaction: discord.Interaction):
         """Manually refresh event data"""
         await interaction.response.send_message('Refreshing event data...')
-        await events_db.update_all_events(self.bot.database.conn)
+        await events_db.update_all_events(self.database.conn)
         await interaction.followup.send('Event data refreshed.')
 
     @tasks.loop(hours=1)
     async def event_refresh(self):
         """Automatically refresh event data periodically"""
-        if hasattr(self.bot, 'database') and self.bot.database.conn:
-            await events_db.update_all_events(self.bot.database.conn)
+        if self.database and self.database.conn:
+            await events_db.update_all_events(self.database.conn)
 
 async def setup(bot):
     # Create and add the cog first
