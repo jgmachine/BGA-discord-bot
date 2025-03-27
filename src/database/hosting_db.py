@@ -139,50 +139,45 @@ class HostingDatabase(BaseDatabase):
         
         host_logger.info("Rotating hosts")
         try:
-            cursor = self._execute(
-                f"SELECT discord_id, username, {position_field} FROM hosting_rotation WHERE {active_field}=1 ORDER BY {position_field} ASC LIMIT 1",
+            results = self._execute(
+                f"SELECT discord_id, username, {position_field} FROM hosting_rotation WHERE {active_field}=1 ORDER BY {position_field} ASC LIMIT 1"
             )
-            host = cursor.fetchone()
-            if not host:
+            
+            if not results or len(results) == 0:
                 host_logger.warning("No active hosts found for rotation")
                 return "No active hosts found."
                 
-            host_id, host_name, host_position = host
+            host_id, host_name, host_position = results[0]
             host_logger.info(f"Current host: {host_name} (position {host_position})")
             
+            # Update last hosted date
             self._execute(
                 f"UPDATE hosting_rotation SET {last_hosted_field} = DATE('now') WHERE discord_id = ?",
                 (host_id,)
             )
             
-            cursor = self._execute(f"SELECT MAX({position_field}) FROM hosting_rotation WHERE {active_field}=1")
-            max_pos = cursor.fetchone()[0] or 0
+            # Get max position
+            results = self._execute(f"SELECT MAX({position_field}) FROM hosting_rotation WHERE {active_field}=1")
+            max_pos = results[0][0] if results and results[0][0] is not None else 0
             
+            # Move current host to end
             self._execute(
                 f"UPDATE hosting_rotation SET {position_field} = ? WHERE discord_id = ?",
                 (max_pos + 1, host_id)
             )
             
+            # Move everyone else up
             self._execute(
                 f"UPDATE hosting_rotation SET {position_field} = {position_field} - 1 WHERE discord_id != ? AND {active_field}=1",
                 (host_id,)
             )
             
-            cursor = self._execute(
-                f"SELECT MAX({position_field}) FROM hosting_rotation WHERE {active_field}=1 AND discord_id != ?",
-                (host_id,)
-            )
-            new_max = cursor.fetchone()[0] or 0
-            
-            self._execute(
-                f"UPDATE hosting_rotation SET {position_field} = ? WHERE discord_id = ?",
-                (new_max + 1, host_id)
-            )
-            
+            # Resequence to ensure no gaps
             self._resequence_positions(host_type_id)
             
             host_logger.info(f"Host {host_name} rotated to the end of the queue")
             return f"Rotated: {host_name} moved to the end of the queue"
+            
         except Exception as e:
             host_logger.error(f"Error rotating hosts: {e}")
             raise
