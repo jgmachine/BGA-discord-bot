@@ -100,53 +100,12 @@ class HostingRotationCommands(commands.Cog):
         logger.info(f"🔄 Received command: /host_move {member.name} to {position.value}")
         
         try:
-            database.connect()
-            cursor = database.cursor
-            
-            # Verify host exists and is active
-            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=?", (str(member.id),))
-            host = cursor.fetchone()
-            if not host:
-                await interaction.response.send_message(f"❌ {member.name} is not in the host list.")
-                return
-                
-            username, current_pos = host
-            
-            if position.value == "top":
-                # Move everyone else down one
-                cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1")
-                # Move target host to top
-                cursor.execute("UPDATE hosting_rotation SET order_position = 1 WHERE discord_id = ?", (str(member.id),))
-                msg = f"✅ {username} has been moved to the top of the list!"
-                
-            elif position.value == "bottom":
-                # Get max position
-                cursor.execute("SELECT MAX(order_position) FROM hosting_rotation")
-                max_pos = cursor.fetchone()[0]
-                # Move others up if needed
-                cursor.execute("UPDATE hosting_rotation SET order_position = order_position - 1 WHERE order_position > ?", 
-                             (current_pos,))
-                # Move target host to bottom
-                cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
-                             (max_pos, str(member.id),))
-                msg = f"✅ {username} has been moved to the bottom of the list!"
-                
-            else:  # next
-                # Move to position 2 (right after current host)
-                cursor.execute("UPDATE hosting_rotation SET order_position = order_position + 1 WHERE order_position > 1")
-                cursor.execute("UPDATE hosting_rotation SET order_position = 2 WHERE discord_id = ?", (str(member.id),))
-                msg = f"✅ {username} will host next!"
-            
-            database.conn.commit()
-            await interaction.response.send_message(msg)
-            logger.info(f"✅ Successfully moved {username} to {position.value}")
-            
+            result = self.database.move_host(str(member.id), position.value, host_type_id=1)
+            await interaction.response.send_message(f"✅ {result}")
+            logger.info(f"✅ Successfully moved {member.name} to {position.value}")
         except Exception as e:
             logger.error(f"Error moving host: {e}")
-            database.conn.rollback()
             await interaction.response.send_message("❌ An error occurred while processing this command.")
-        finally:
-            database.close()
 
     @host_command()
     @app_commands.describe(first="First host", second="Second host")
@@ -211,23 +170,55 @@ class HostingRotationCommands(commands.Cog):
 
     @host_command()
     async def host_list(self, interaction: discord.Interaction):
-        """Displays the current host list order"""
+        """Displays both venue and game host rotations"""
         logger.info("🔄 Received command: /host_list")
 
-        hosts = database.get_all_hosts()
+        venue_hosts = self.database.get_all_hosts(host_type_id=1)
+        game_hosts = self.database.get_all_hosts(host_type_id=2)
         
-        if hosts:
-            embed = discord.Embed(
-                title="🎲 Current Hosting Rotation",
-                description="\n".join([f"{host['position']}. {host['username']}" for host in hosts]),
-                color=discord.Color.blue()
+        embed = discord.Embed(
+            title="🏡 Hosting Schedule",
+            description="Current venue hosts and secondary game hosts rotations",
+            color=discord.Color.blue()
+        )
+
+        # Show current/next hosts at the top
+        if venue_hosts:
+            next_venue = venue_hosts[0]['username']
+            embed.add_field(
+                name="📍 Next Venue Host",
+                value=f"**{next_venue}** will host the next event",
+                inline=False
             )
-            
-            await interaction.response.send_message(embed=embed)
-            logger.info(f"✅ Displayed host list with {len(hosts)} hosts")
-        else:
-            await interaction.response.send_message("❌ No active hosts found.")
-            logger.warning("⚠️ No active hosts found for host list.")
+
+            # Find first game host who isn't the venue host
+            next_game_host = next((host['username'] for host in game_hosts 
+                                 if host['username'] != next_venue), None)
+            if next_game_host:
+                embed.add_field(
+                    name="🎲 Available Game Host",
+                    value=f"**{next_game_host}** can host a second game if needed",
+                    inline=False
+                )
+            embed.add_field(name="\u200b", value="\u200b", inline=False)  # Spacer
+
+        # Show full rotations side by side
+        venue_list = "\n".join([f"{h['position']}. {h['username']}" for h in venue_hosts]) if venue_hosts else "No venue hosts"
+        game_list = "\n".join([f"{h['position']}. {h['username']}" for h in game_hosts]) if game_hosts else "No game hosts"
+        
+        embed.add_field(
+            name="📋 Venue Host Rotation",
+            value=venue_list,
+            inline=True
+        )
+        embed.add_field(
+            name="🎲 Game Host Rotation",
+            value=game_list,
+            inline=True
+        )
+        
+        await interaction.response.send_message(embed=embed)
+        logger.info(f"✅ Displayed host list with {len(venue_hosts)} venue hosts and {len(game_hosts)} game hosts")
 
     @host_command()
     async def host_help(self, interaction: discord.Interaction):
@@ -235,48 +226,148 @@ class HostingRotationCommands(commands.Cog):
         logger.info("🔄 Received command: /host_help")
         
         embed = discord.Embed(
-            title="🎲 Host List Commands",
-            description="Here are all the commands available for managing the game host list:",
+            title="🎲 Hosting Commands",
+            description="Commands for managing both venue and game host rotations:",
             color=discord.Color.blue()
         )
         
         embed.add_field(
-            name="📋 View Commands",
+            name="📋 Venue Host Commands",
             value=(
-                "**/host_next** - Shows who's next in the list\n"
-                "**/host_list** - Displays the complete host order"
+                "**/host_next** - Shows who's next to host venue\n"
+                "**/host_list** - Shows venue host rotation\n"
+                "**/host_rotate** - Moves current venue host to bottom\n"
+                "**/host_move @user [top/bottom/next]** - Move venue host position\n"
+                "**/host_swap @user1 @user2** - Swap venue hosts\n"
+                "**/host_add @user** - Add venue host\n"
+                "**/host_remove @user** - Remove venue host"
             ),
             inline=False
         )
         
         embed.add_field(
-            name="🔄 List Management",
+            name="🎲 Game Host Commands",
             value=(
-                "**/host_rotate** - Moves current host to the bottom\n"
-                "**/host_move @user [top/bottom/next]** - Move a host to a specific position\n"
-                "**/host_swap @user1 @user2** - Swaps the positions of two hosts"
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="👤 User Management",
-            value=(
-                "**/host_add @user** - Adds a new user to the list\n"
-                "**/host_remove @user** - Removes a user from the list"
+                "**/host2_next** - Shows who's next to host game\n"
+                "**/host2_list** - Shows game host rotation\n"
+                "**/host2_rotate** - Moves current game host to bottom\n"
+                "**/host2_move @user [top/bottom/next]** - Move game host position\n"
+                "**/host2_add @user** - Add game host\n"
+                "**/host2_remove @user** - Remove game host"
             ),
             inline=False
         )
         
         embed.set_footer(text="Commands must be used in the designated channel")
-        
         await interaction.response.send_message(embed=embed)
+        logger.info("✅ Displayed hosting help information")
+
+class SecondaryHostCommands(commands.Cog):
+    """Commands for managing the secondary game hosts."""
+    
+    def __init__(self, bot):
+        self.bot = bot
+        self.config = Config.load()
+        self.database = Database(self.config.database_path)
+        self.hosting_rotation_channel_id = self.config.hosting_rotation_channel_id
+
+    @host_command()
+    @app_commands.describe(member="The user to add to the game host list")
+    async def host2_add(self, interaction: discord.Interaction, member: discord.Member):
+        """Adds a user to the secondary game host list"""
+        logger.info(f"🔄 Adding secondary host: {member.name}")
         
-        embed.set_footer(text="Commands must be used in the designated channel")
+        try:
+            # Remove debug_schema call since we've confirmed schema is correct
+            success = self.database.add_host(str(member.id), member.name, host_type_id=2)
+            if success:
+                await interaction.response.send_message(
+                    f"✅ {member.name} has been added to the game host list!"
+                )
+            else:
+                await interaction.response.send_message(
+                    f"❌ Failed to add {member.name} to the game host list."
+                )
+        except Exception as e:
+            logger.error(f"Error adding game host: {e}")
+            await interaction.response.send_message(
+                "❌ An error occurred while adding the game host. Check the logs for details."
+            )
+
+    @host_command()
+    @app_commands.describe(member="The user to remove from the game host list")
+    async def host2_remove(self, interaction: discord.Interaction, member: discord.Member):
+        """Removes a user from the game host list"""
+        logger.info(f"🔄 Removing secondary host: {member.name}")
+        try:
+            cursor = self._execute(
+                "UPDATE hosting_rotation SET game_active=0, game_position=NULL WHERE discord_id=?",
+                (str(member.id),)
+            )
+            if cursor.rowcount == 0:
+                await interaction.response.send_message(f"❌ {member.name} is not in the game host list.")
+                return
+            await interaction.response.send_message(f"✅ {member.name} has been removed from the game host list.")
+        except Exception as e:
+            logger.error(f"Error removing game host: {e}")
+            await interaction.response.send_message("❌ An error occurred while processing this command.")
+
+    @host_command()
+    async def host2_next(self, interaction: discord.Interaction):
+        """Shows who's next in the game host list"""
+        host = self.database.get_next_host(host_type_id=2)
+        if host:
+            await interaction.response.send_message(
+                f"🎲 The next game host is: **{host['username']}**"
+            )
+        else:
+            await interaction.response.send_message("❌ No active game hosts found.")
+
+    @host_command()
+    async def host2_rotate(self, interaction: discord.Interaction):
+        """Moves the current game host to the bottom of the list"""
+        result = self.database.rotate_hosts(host_type_id=2)
+        await interaction.response.send_message("✅ Game host rotation updated!")
+        logger.info(f"✅ Game host rotation has been updated. {result}")
+
+    @host_command()
+    async def host2_list(self, interaction: discord.Interaction):
+        """Displays the current game host list order"""
+        hosts = self.database.get_all_hosts(host_type_id=2)
         
-        await interaction.response.send_message(embed=embed)
-        logger.info("✅ Displayed host help information")
+        if hosts:
+            embed = discord.Embed(
+                title="🎲 Current Game Host Rotation",
+                description="\n".join([f"{host['position']}. {host['username']}" for host in hosts]),
+                color=discord.Color.green()
+            )
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.response.send_message("❌ No active game hosts found.")
+
+    @host_command()
+    @app_commands.describe(
+        member="The user to move",
+        position="Where to move them (top/bottom/next)",
+    )
+    @app_commands.choices(position=[
+        app_commands.Choice(name="Top of list", value="top"),
+        app_commands.Choice(name="Bottom of list", value="bottom"),
+        app_commands.Choice(name="Next in line", value="next")
+    ])
+    async def host2_move(self, interaction: discord.Interaction, member: discord.Member, position: app_commands.Choice[str]):
+        """Move a game host to a specific position"""
+        logger.info(f"🔄 Received command: /host2_move {member.name} to {position.value}")
+        
+        try:
+            result = self.database.move_host(str(member.id), position.value, host_type_id=2)
+            await interaction.response.send_message(f"✅ {result}")
+            logger.info(f"✅ Successfully moved {member.name} to {position.value}")
+        except Exception as e:
+            logger.error(f"Error moving game host: {e}")
+            await interaction.response.send_message("❌ An error occurred while moving the game host.")
 
 async def setup(bot):
     await bot.add_cog(HostingRotationCommands(bot))
-    logger.info("✅ HostingRotationCommands cog has been loaded")
+    await bot.add_cog(SecondaryHostCommands(bot))
+    logger.info("✅ Hosting rotation commands loaded")
