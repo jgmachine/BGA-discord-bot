@@ -12,13 +12,13 @@ logger = logging.getLogger('counting_game')
 class CountingGame(commands.Cog):
     """Commands and logic for the counting game."""
     
-    # Class constant for target number range
-    TARGET_RANGE = (1, 10)  # Easier for testing - change to (1, 100) for production
-    
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.load()
         self.database = Database(self.config.database_path)
+        
+        # Set target range from config
+        self.target_range = (1, self.config.target_max)
         
         # Initialize database tables immediately
         logger.info("Creating database tables...")
@@ -113,7 +113,7 @@ class CountingGame(commands.Cog):
 
     def _generate_target(self):
         """Generate a new target number using the configured range."""
-        return random.randint(*self.TARGET_RANGE)
+        return random.randint(*self.target_range)
 
     def _load_game_state(self):
         """Load game state from database."""
@@ -249,8 +249,11 @@ class CountingGame(commands.Cog):
                 await message.add_reaction(self._get_random_negative_emoji())
                 await message.channel.send("❌ New round! Please start counting from 0.")
                 return
-            # Reset last_counter when first valid number (0) is entered
-            self.last_counter = None
+            # Prevent last winner from starting new round using last_counter
+            if message.author.id == self.last_counter:
+                await message.add_reaction(self._get_random_negative_emoji())
+                await message.channel.send("❌ Winners can't start the next round! Give someone else a chance!")
+                return
             
         if number != expected_number:
             await message.add_reaction(self._get_random_negative_emoji())
@@ -282,7 +285,7 @@ class CountingGame(commands.Cog):
             
             self.current_count = -1
             self.target_number = self._generate_target()
-            # Don't reset last_counter here anymore, wait until first valid number
+            # Keep last_counter to prevent winner from starting next round
             await message.channel.send("New round starting! I'm a computer, so start at 0!")
         else:
             await message.add_reaction("✅")

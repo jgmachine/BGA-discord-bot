@@ -14,6 +14,7 @@ class Config:
     counting_channel_id: int
     data_dir: Path
     database_path: Path
+    target_max: int
 
     @classmethod
     def load(cls) -> 'Config':
@@ -36,5 +37,6 @@ class Config:
             hosting_rotation_channel_id=int(os.getenv("HOSTING_ROTATION_CHANNEL_ID", "0")),
             counting_channel_id=int(os.getenv("COUNTING_CHANNEL_ID", "0")),
             data_dir=data_dir,
-            database_path=database_path
+            database_path=database_path,
+            target_max=int(os.getenv('COUNTING_TARGET_MAX', '100'))
         )
