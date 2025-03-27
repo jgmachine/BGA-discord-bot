@@ -72,7 +72,8 @@ def _row_to_dict(row):
     """Convert a sqlite3.Row to a dictionary with proper datetime conversion."""
     if not row:
         return None
-    data = dict(zip([col[0] for col in row.description], row))
+    # Convert Row to dict using the row.keys() method
+    data = {key: row[key] for key in row.keys()}
     # Convert string dates back to datetime objects
     if 'date' in data and isinstance(data['date'], str):
         data['date'] = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
