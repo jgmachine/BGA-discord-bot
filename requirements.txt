@@ -12,3 +12,5 @@ python-dotenv==1.0.1
 requests==2.32.3
 urllib3==2.2.1
 yarl==1.9.4
+beautifulsoup4==4.12.2beautifulsoup4==4.12.2
+
