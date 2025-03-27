@@ -23,10 +23,10 @@ def setup_events_table(conn):
 def add_event(conn, url):
     """Add a new event URL to track."""
     try:
-        setup_events_table(conn)
-        conn.execute('INSERT OR IGNORE INTO events (url) VALUES (?)', (url,))
-        conn.commit()
-        return True
+        with conn:  # Use context manager for transaction
+            setup_events_table(conn)
+            conn.execute('INSERT OR IGNORE INTO events (url) VALUES (?)', (url,))
+            return True
     except Exception as e:
         logging.error(f"Error adding event: {str(e)}")
         return False
@@ -34,9 +34,9 @@ def add_event(conn, url):
 def remove_event(conn, url):
     """Remove an event URL from tracking."""
     try:
-        conn.execute('DELETE FROM events WHERE url = ?', (url,))
-        conn.commit()
-        return True
+        with conn:  # Use context manager for transaction
+            conn.execute('DELETE FROM events WHERE url = ?', (url,))
+            return True
     except Exception as e:
         logging.error(f"Error removing event: {str(e)}")
         return False
@@ -46,18 +46,18 @@ async def update_event(conn, url):
     try:
         event = await webscraper.scrape_aftergame_event(url)
         if event:
-            conn.execute('''
-                UPDATE events 
-                SET name=?, date=?, venue=?, address=?, going_count=?, 
-                    description=?, image_url=?, last_updated=?
-                WHERE url=?
-            ''', (
-                event['name'], event['date'], event['venue'], event['address'],
-                event['going_count'], event['description'], event['image_url'],
-                datetime.utcnow(), url
-            ))
-            conn.commit()
-            return True
+            with conn:  # Use context manager for transaction
+                conn.execute('''
+                    UPDATE events 
+                    SET name=?, date=?, venue=?, address=?, going_count=?, 
+                        description=?, image_url=?, last_updated=?
+                    WHERE url=?
+                ''', (
+                    event['name'], event['date'], event['venue'], event['address'],
+                    event['going_count'], event['description'], event['image_url'],
+                    datetime.utcnow(), url
+                ))
+                return True
     except Exception as e:
         logging.error(f"Error updating event: {str(e)}")
     return False
