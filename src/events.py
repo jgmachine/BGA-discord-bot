@@ -23,10 +23,10 @@ class EventCommands(commands.Cog):
         self.config = Config.load()
         self.database = Database(self.config.database_path)
         self.database.connect()  # Ensure database is connected on init
-        self.event_refresh.start()
+        self.refresh_task.start()  # Updated to use new name
 
     def cog_unload(self):
-        self.event_refresh.cancel()
+        self.refresh_task.cancel()  # Updated to use new name
         self.database.close()  # Close database connection on unload
 
     @event_command()
@@ -96,7 +96,6 @@ class EventCommands(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     @event_command()
-    @app_commands.command(name="event_refresh", description="Manually refresh event data")
     async def event_refresh(self, interaction: discord.Interaction):
         """Manually refresh event data"""
         await interaction.response.send_message('Refreshing event data...')
@@ -104,7 +103,7 @@ class EventCommands(commands.Cog):
         await interaction.followup.send('Event data refreshed.')
 
     @tasks.loop(minutes=15)
-    async def event_refresh(self):
+    async def refresh_task(self):  # Renamed from event_refresh
         """Automatically refresh event data periodically"""
         if self.database and self.database.conn:
             await events_db.update_all_events(self.database.conn)
