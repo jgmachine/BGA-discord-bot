@@ -13,113 +13,98 @@ class HostingDatabase(BaseDatabase):
 
     def create_tables(self):
         """Creates hosting rotation tables."""
-        # Create host types table
+        # Remove the host_types table as we'll track positions directly
         self._execute('''
-            CREATE TABLE IF NOT EXISTS hosting_types (
-                id INTEGER PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                description TEXT
+            CREATE TABLE IF NOT EXISTS hosting_rotation (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                discord_id TEXT NOT NULL,
+                username TEXT NOT NULL,
+                venue_position INTEGER,           -- Position in venue hosting list
+                game_position INTEGER,            -- Position in game hosting list
+                last_venue_hosted DATE,           -- Last time they hosted venue
+                last_game_hosted DATE,           -- Last time they hosted game
+                venue_active INTEGER DEFAULT 0,   -- Whether they're in venue rotation
+                game_active INTEGER DEFAULT 0     -- Whether they're in game rotation
             )
         ''')
         
-        # Insert default host types if they don't exist
-        self._execute('''
-            INSERT OR IGNORE INTO hosting_types (id, name, description) VALUES 
-            (1, 'venue', 'Primary venue/house host'),
-            (2, 'game', 'Secondary game table host')
-        ''')
-
-        # Check if hosting_rotation table exists and get its columns
-        results = self._execute("PRAGMA table_info(hosting_rotation)")
-        existing_columns = [row[1] for row in results] if results else []
-        
-        if not existing_columns:
-            # Create new table if it doesn't exist
-            self._execute('''
-                CREATE TABLE hosting_rotation (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    discord_id TEXT NOT NULL,
-                    username TEXT NOT NULL,
-                    order_position INTEGER NOT NULL,
-                    last_hosted DATE,
-                    active INTEGER DEFAULT 1,
-                    host_type_id INTEGER DEFAULT 1,
-                    UNIQUE(discord_id, host_type_id),
-                    FOREIGN KEY(host_type_id) REFERENCES hosting_types(id)
-                )
-            ''')
-        elif 'host_type_id' not in existing_columns:
-            # Add host_type_id column to existing table
-            host_logger.info("Adding host_type_id column to existing hosting_rotation table")
-            self._execute('''
-                ALTER TABLE hosting_rotation 
-                ADD COLUMN host_type_id INTEGER DEFAULT 1
-            ''')
-            # Add unique constraint
-            self._execute('''
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_discord_host_type 
-                ON hosting_rotation(discord_id, host_type_id)
-            ''')
-
         host_logger.info("Hosting rotation tables created/updated successfully")
 
     def add_host(self, discord_id, username, host_type_id=1):
         """Adds a user to the specified hosting rotation."""
-        host_logger.info(f"Adding host: discord_id={discord_id}, username={username}, type={host_type_id}")
         try:
+            # First check if user exists
             results = self._execute(
-                "SELECT MAX(order_position) FROM hosting_rotation WHERE host_type_id=?",
-                (host_type_id,)
+                "SELECT id FROM hosting_rotation WHERE discord_id=?",
+                (discord_id,)
+            )
+            
+            if not results:
+                # New user - insert them
+                self._execute(
+                    """INSERT INTO hosting_rotation 
+                       (discord_id, username, venue_position, game_position, 
+                        venue_active, game_active) 
+                       VALUES (?, ?, NULL, NULL, 0, 0)""",
+                    (discord_id, username)
+                )
+            
+            # Get max position for the appropriate rotation
+            position_field = "venue_position" if host_type_id == 1 else "game_position"
+            active_field = "venue_active" if host_type_id == 1 else "game_active"
+            
+            results = self._execute(
+                f"SELECT MAX({position_field}) FROM hosting_rotation WHERE {active_field}=1"
             )
             max_pos = results[0][0] if results and results[0][0] is not None else 0
             next_position = max_pos + 1
             
-            host_logger.debug(f"Next position calculated as {next_position}")
-            
-            cursor = self._execute(
-                """INSERT OR IGNORE INTO hosting_rotation 
-                   (discord_id, username, order_position, host_type_id) 
-                   VALUES (?, ?, ?, ?)""",
-                (discord_id, username, next_position, host_type_id)
+            # Update the user's position and active status for the specified rotation
+            self._execute(
+                f"""UPDATE hosting_rotation 
+                    SET {position_field}=?, {active_field}=1 
+                    WHERE discord_id=?""",
+                (next_position, discord_id)
             )
             
-            rows_affected = cursor.rowcount if hasattr(cursor, 'rowcount') else 0
-            host_logger.info(f"Host added successfully, rows affected: {rows_affected}")
-            return rows_affected
+            host_logger.info(f"Host added to {'venue' if host_type_id == 1 else 'game'} rotation")
+            return True
+            
         except Exception as e:
             host_logger.error(f"Error adding host: {e}")
             raise
 
     def get_next_host(self, host_type_id=1):
         """Fetches the next user in the specified hosting rotation."""
-        host_logger.info("Fetching next host")
+        position_field = "venue_position" if host_type_id == 1 else "game_position"
+        active_field = "venue_active" if host_type_id == 1 else "game_active"
+        
         try:
-            cursor = self._execute(
-                """SELECT discord_id, username 
-                   FROM hosting_rotation 
-                   WHERE active=1 AND host_type_id=? 
-                   ORDER BY order_position ASC LIMIT 1""",
-                (host_type_id,)
+            results = self._execute(
+                f"""SELECT discord_id, username 
+                    FROM hosting_rotation 
+                    WHERE {active_field}=1 
+                    ORDER BY {position_field} ASC LIMIT 1"""
             )
-            next_host = cursor.fetchone()
             
-            if next_host:
-                host_logger.info(f"Next host found: {next_host[1]}")
-                return {"discord_id": next_host[0], "username": next_host[1]}
-            else:
-                host_logger.warning("No active hosts found in rotation")
-                return None
+            if results:
+                return {"discord_id": results[0][0], "username": results[0][1]}
+            return None
+            
         except Exception as e:
-            host_logger.error(f"Error fetching next host: {e}")
+            host_logger.error(f"Error getting next host: {e}")
             raise
 
     def rotate_hosts(self, host_type_id=1):
         """Moves the current host to the back of the queue."""
+        position_field = "venue_position" if host_type_id == 1 else "game_position"
+        active_field = "venue_active" if host_type_id == 1 else "game_active"
+        last_hosted_field = "last_venue_hosted" if host_type_id == 1 else "last_game_hosted"
+        
         host_logger.info("Rotating hosts")
         try:
             cursor = self._execute(
-                "SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 AND host_type_id=? ORDER BY order_position ASC LIMIT 1",
-                (host_type_id,)
+                f"SELECT discord_id, username, {position_field} FROM hosting_rotation WHERE {active_field}=1 ORDER BY {position_field} ASC LIMIT 1",
             )
             host = cursor.fetchone()
             if not host:
@@ -130,33 +115,32 @@ class HostingDatabase(BaseDatabase):
             host_logger.info(f"Current host: {host_name} (position {host_position})")
             
             self._execute(
-                "UPDATE hosting_rotation SET last_hosted = DATE('now') WHERE discord_id = ? AND host_type_id=?",
-                (host_id, host_type_id)
+                f"UPDATE hosting_rotation SET {last_hosted_field} = DATE('now') WHERE discord_id = ?",
+                (host_id,)
             )
             
-            cursor = self._execute("SELECT MAX(order_position) FROM hosting_rotation WHERE active=1 AND host_type_id=?",
-                                   (host_type_id,))
+            cursor = self._execute(f"SELECT MAX({position_field}) FROM hosting_rotation WHERE {active_field}=1")
             max_pos = cursor.fetchone()[0] or 0
             
             self._execute(
-                "UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ? AND host_type_id=?",
-                (max_pos + 1, host_id, host_type_id)
+                f"UPDATE hosting_rotation SET {position_field} = ? WHERE discord_id = ?",
+                (max_pos + 1, host_id)
             )
             
             self._execute(
-                "UPDATE hosting_rotation SET order_position = order_position - 1 WHERE discord_id != ? AND active=1 AND host_type_id=?",
-                (host_id, host_type_id)
+                f"UPDATE hosting_rotation SET {position_field} = {position_field} - 1 WHERE discord_id != ? AND {active_field}=1",
+                (host_id,)
             )
             
             cursor = self._execute(
-                "SELECT MAX(order_position) FROM hosting_rotation WHERE active=1 AND discord_id != ? AND host_type_id=?",
-                (host_id, host_type_id)
+                f"SELECT MAX({position_field}) FROM hosting_rotation WHERE {active_field}=1 AND discord_id != ?",
+                (host_id,)
             )
             new_max = cursor.fetchone()[0] or 0
             
             self._execute(
-                "UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ? AND host_type_id=?",
-                (new_max + 1, host_id, host_type_id)
+                f"UPDATE hosting_rotation SET {position_field} = ? WHERE discord_id = ?",
+                (new_max + 1, host_id)
             )
             
             self._resequence_positions(host_type_id)
@@ -169,11 +153,15 @@ class HostingDatabase(BaseDatabase):
 
     def defer_host(self, discord_id, host_type_id=1):
         """Defers a host (keeps them at their current position)."""
+        position_field = "venue_position" if host_type_id == 1 else "game_position"
+        last_hosted_field = "last_venue_hosted" if host_type_id == 1 else "last_game_hosted"
+        active_field = "venue_active" if host_type_id == 1 else "game_active"
+        
         host_logger.info(f"Deferring host with discord_id={discord_id}")
         try:
             cursor = self._execute(
-                "SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1 AND host_type_id=?", 
-                (discord_id, host_type_id)
+                f"SELECT username, {position_field} FROM hosting_rotation WHERE discord_id=? AND {active_field}=1", 
+                (discord_id,)
             )
             host = cursor.fetchone()
             if not host:
@@ -183,8 +171,8 @@ class HostingDatabase(BaseDatabase):
             username, position = host
             
             self._execute(
-                "UPDATE hosting_rotation SET last_hosted = DATE('now', '-7 days') WHERE discord_id = ? AND host_type_id=?",
-                (discord_id, host_type_id)
+                f"UPDATE hosting_rotation SET {last_hosted_field} = DATE('now', '-7 days') WHERE discord_id = ?",
+                (discord_id,)
             )
             
             host_logger.info(f"Host {username} deferred successfully (keeping position {position})")
@@ -195,11 +183,14 @@ class HostingDatabase(BaseDatabase):
 
     def snooze_host(self, discord_id, host_type_id=1):
         """Temporarily removes a user from the hosting rotation."""
+        position_field = "venue_position" if host_type_id == 1 else "game_position"
+        active_field = "venue_active" if host_type_id == 1 else "game_active"
+        
         host_logger.info(f"Snoozing host with discord_id={discord_id}")
         try:
             cursor = self._execute(
-                "SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1 AND host_type_id=?",
-                (discord_id, host_type_id)
+                f"SELECT username, {position_field} FROM hosting_rotation WHERE discord_id=? AND {active_field}=1",
+                (discord_id,)
             )
             host = cursor.fetchone()
             if not host:
@@ -209,13 +200,13 @@ class HostingDatabase(BaseDatabase):
             username, position = host
             
             self._execute(
-                "UPDATE hosting_rotation SET active=0 WHERE discord_id=? AND host_type_id=?",
-                (discord_id, host_type_id)
+                f"UPDATE hosting_rotation SET {active_field}=0 WHERE discord_id=?",
+                (discord_id,)
             )
             
             self._execute(
-                "UPDATE hosting_rotation SET order_position = order_position - 1 WHERE order_position > ? AND host_type_id=?",
-                (position, host_type_id)
+                f"UPDATE hosting_rotation SET {position_field} = {position_field} - 1 WHERE {position_field} > ?",
+                (position,)
             )
             
             host_logger.info(f"Host {username} snoozed successfully")
@@ -226,25 +217,27 @@ class HostingDatabase(BaseDatabase):
 
     def activate_host(self, discord_id, host_type_id=1):
         """Re-adds a snoozed user to the hosting rotation."""
+        position_field = "venue_position" if host_type_id == 1 else "game_position"
+        active_field = "venue_active" if host_type_id == 1 else "game_active"
+        
         host_logger.info(f"Activating host with discord_id={discord_id}")
         try:
             cursor = self._execute(
-                "SELECT username FROM hosting_rotation WHERE discord_id=? AND active=0 AND host_type_id=?",
-                (discord_id, host_type_id)
+                f"SELECT username FROM hosting_rotation WHERE discord_id=? AND {active_field}=0",
+                (discord_id,)
             )
             host = cursor.fetchone()
             if not host:
                 host_logger.warning(f"Host with discord_id={discord_id} not found or already active")
                 return "Host not found or already active"
                 
-            cursor = self._execute("SELECT MAX(order_position) FROM hosting_rotation WHERE host_type_id=?",
-                                   (host_type_id,))
+            cursor = self._execute(f"SELECT MAX({position_field}) FROM hosting_rotation")
             max_pos = cursor.fetchone()[0] or 0
             next_position = max_pos + 1
             
             self._execute(
-                "UPDATE hosting_rotation SET active=1, order_position=?, host_type_id=? WHERE discord_id=?",
-                (next_position, host_type_id, discord_id)
+                f"UPDATE hosting_rotation SET {active_field}=1, {position_field}=? WHERE discord_id=?",
+                (next_position, discord_id)
             )
             
             host_logger.info(f"Host {host[0]} activated and placed at position {next_position}")
@@ -255,14 +248,16 @@ class HostingDatabase(BaseDatabase):
     
     def get_all_hosts(self, host_type_id=1):
         """Returns all active hosts in their current rotation order."""
+        position_field = "venue_position" if host_type_id == 1 else "game_position"
+        active_field = "venue_active" if host_type_id == 1 else "game_active"
+        
         host_logger.info("Fetching all hosts in rotation order")
         try:
             # Ensure there are no gaps in positions before fetching
             self._resequence_positions(host_type_id)
             
             results = self._execute(
-                "SELECT discord_id, username, order_position FROM hosting_rotation WHERE active=1 AND host_type_id=? ORDER BY order_position ASC",
-                (host_type_id,)
+                f"SELECT discord_id, username, {position_field} FROM hosting_rotation WHERE {active_field}=1 ORDER BY {position_field} ASC",
             )
             
             if results:
@@ -277,18 +272,20 @@ class HostingDatabase(BaseDatabase):
 
     def _resequence_positions(self, host_type_id=1):
         """Helper method to ensure host positions are sequential (1, 2, 3...) with no gaps."""
+        position_field = "venue_position" if host_type_id == 1 else "game_position"
+        active_field = "venue_active" if host_type_id == 1 else "game_active"
+        
         try:
             # Get all active hosts ordered by their current position
             results = self._execute(
-                "SELECT discord_id FROM hosting_rotation WHERE active=1 AND host_type_id=? ORDER BY order_position ASC",
-                (host_type_id,)
+                f"SELECT discord_id FROM hosting_rotation WHERE {active_field}=1 ORDER BY {position_field} ASC",
             )
             
             # Reassign positions sequentially
             for idx, host in enumerate(results, 1):
                 self._execute(
-                    "UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ? AND host_type_id=?",
-                    (idx, host[0], host_type_id)
+                    f"UPDATE hosting_rotation SET {position_field} = ? WHERE discord_id = ?",
+                    (idx, host[0])
                 )
             
             host_logger.info(f"Resequenced positions for {len(results)} active hosts")
