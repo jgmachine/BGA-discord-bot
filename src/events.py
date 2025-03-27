@@ -96,6 +96,7 @@ class EventCommands(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     @event_command()
+    @app_commands.command(name="event_refresh", description="Manually refresh event data")
     async def event_refresh(self, interaction: discord.Interaction):
         """Manually refresh event data"""
         await interaction.response.send_message('Refreshing event data...')
