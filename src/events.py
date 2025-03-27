@@ -22,10 +22,12 @@ class EventCommands(commands.Cog):
         self.bot = bot
         self.config = Config.load()
         self.database = Database(self.config.database_path)
+        self.database.connect()  # Ensure database is connected on init
         self.event_refresh.start()
 
     def cog_unload(self):
         self.event_refresh.cancel()
+        self.database.close()  # Close database connection on unload
 
     @event_command()
     @app_commands.describe(url="The Aftergame event URL to track")
