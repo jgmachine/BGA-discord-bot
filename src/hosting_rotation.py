@@ -292,10 +292,24 @@ class SecondaryHostCommands(commands.Cog):
         """Adds a user to the secondary game host list"""
         logger.info(f"🔄 Adding secondary host: {member.name}")
         
-        self.database.add_host(str(member.id), member.name, host_type_id=2)
-        await interaction.response.send_message(
-            f"✅ {member.name} has been added to the game host list!"
-        )
+        try:
+            # Debug schema before operation
+            self.database.debug_schema()
+            
+            success = self.database.add_host(str(member.id), member.name, host_type_id=2)
+            if success:
+                await interaction.response.send_message(
+                    f"✅ {member.name} has been added to the game host list!"
+                )
+            else:
+                await interaction.response.send_message(
+                    f"❌ Failed to add {member.name} to the game host list."
+                )
+        except Exception as e:
+            logger.error(f"Error adding game host: {e}")
+            await interaction.response.send_message(
+                "❌ An error occurred while adding the game host. Check the logs for details."
+            )
 
     @host_command()
     @app_commands.describe(member="The user to remove from the game host list")

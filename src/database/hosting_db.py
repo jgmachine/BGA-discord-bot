@@ -12,23 +12,59 @@ class HostingDatabase(BaseDatabase):
     """Hosting-specific database operations."""
 
     def create_tables(self):
-        """Creates hosting rotation tables."""
-        # Remove the host_types table as we'll track positions directly
-        self._execute('''
-            CREATE TABLE IF NOT EXISTS hosting_rotation (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                discord_id TEXT NOT NULL,
-                username TEXT NOT NULL,
-                venue_position INTEGER,           -- Position in venue hosting list
-                game_position INTEGER,            -- Position in game hosting list
-                last_venue_hosted DATE,           -- Last time they hosted venue
-                last_game_hosted DATE,           -- Last time they hosted game
-                venue_active INTEGER DEFAULT 0,   -- Whether they're in venue rotation
-                game_active INTEGER DEFAULT 0     -- Whether they're in game rotation
-            )
-        ''')
+        """Creates or updates hosting rotation tables."""
+        # Check if hosting_rotation table exists and get its columns
+        results = self._execute("PRAGMA table_info(hosting_rotation)")
+        existing_columns = [row[1] for row in results] if results else []
         
-        host_logger.info("Hosting rotation tables created/updated successfully")
+        if not existing_columns:
+            # Create new table if it doesn't exist
+            self._execute('''
+                CREATE TABLE hosting_rotation (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    discord_id TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    venue_position INTEGER,
+                    game_position INTEGER,
+                    last_venue_hosted DATE,
+                    last_game_hosted DATE,
+                    venue_active INTEGER DEFAULT 0,
+                    game_active INTEGER DEFAULT 0
+                )
+            ''')
+            host_logger.info("Created new hosting_rotation table")
+        else:
+            # Add any missing columns
+            needed_columns = {
+                'venue_position': 'INTEGER',
+                'game_position': 'INTEGER',
+                'last_venue_hosted': 'DATE',
+                'last_game_hosted': 'DATE',
+                'venue_active': 'INTEGER DEFAULT 0',
+                'game_active': 'INTEGER DEFAULT 0'
+            }
+            
+            for col_name, col_type in needed_columns.items():
+                if col_name not in existing_columns:
+                    self._execute(f'ALTER TABLE hosting_rotation ADD COLUMN {col_name} {col_type}')
+                    host_logger.info(f"Added column {col_name} to hosting_rotation table")
+            
+            # If we're migrating from the old schema, convert existing data
+            if 'order_position' in existing_columns:
+                host_logger.info("Migrating from old schema...")
+                # Copy order_position to venue_position and set venue_active for existing hosts
+                self._execute('''
+                    UPDATE hosting_rotation 
+                    SET venue_position = order_position,
+                        venue_active = active
+                    WHERE order_position IS NOT NULL
+                ''')
+                
+                # Consider dropping old columns if needed
+                # self._execute('ALTER TABLE hosting_rotation DROP COLUMN order_position')
+                # self._execute('ALTER TABLE hosting_rotation DROP COLUMN active')
+        
+        host_logger.info("Hosting rotation tables checked/updated successfully")
 
     def add_host(self, discord_id, username, host_type_id=1):
         """Adds a user to the specified hosting rotation."""
