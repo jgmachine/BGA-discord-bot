@@ -67,11 +67,10 @@ class CountingGame(commands.Cog):
                 
         try:
             await self.counting_channel.send(self._get_random_spawn_gif())
-            # Don't show -1, instead indicate new game starting at 0
-            await self.counting_channel.send(
-                "New game starting! Begin counting at 0!" if self.current_count == -1 
-                else f"Last number counted: `{self.current_count}`"
-            )
+            # Show "start at 0" message when current_count is -1
+            message = ("🎲 New game starting! Begin counting at 0!" if self.current_count == -1 
+                      else f"Last number counted: `{self.current_count}`")
+            await self.counting_channel.send(message)
             logger.info("✅ Game status announced successfully")
             return True
         except Exception as e:
@@ -93,16 +92,18 @@ class CountingGame(commands.Cog):
                 logger.error(f"❌ Could not find counting channel with ID: {self.config.counting_channel_id}")
                 return
 
-            # Force reload game state after ensuring tables exist
             logger.info("Loading game state...")
             self._load_game_state()
             self.ready = True
             
             logger.info("Sending startup message...")
             try:
+                # Update startup message to handle -1 case
+                current_count_msg = ("Start counting at 0!" if self.current_count == -1 
+                                   else f"Current count: `{self.current_count}`")
                 await self.counting_channel.send(
                     f"🎲 **Counting Game is Ready!**\n"
-                    f"Current count: `{self.current_count}`\n"
+                    f"{current_count_msg}\n"
                     f"{self._get_random_spawn_gif()}"
                 )
                 logger.info("✅ Counting game startup complete!")
