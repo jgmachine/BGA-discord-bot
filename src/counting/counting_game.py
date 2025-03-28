@@ -98,14 +98,10 @@ class CountingGame(commands.Cog):
             
             logger.info("Sending startup message...")
             try:
-                # Update startup message to handle -1 case
-                current_count_msg = ("Start counting at 0!" if self.current_count == -1 
-                                   else f"Current count: `{self.current_count}`")
-                await self.counting_channel.send(
-                    f"🎲 **Counting Game is Ready!**\n"
-                    f"{current_count_msg}\n"
-                    f"{self._get_random_spawn_gif()}"
-                )
+                message = ("🎲 **Counting Game is Ready!**\n"
+                          "New game starting! Begin counting at 0!\n")
+                await self.counting_channel.send(message)
+                await self.counting_channel.send(self._get_random_spawn_gif())
                 logger.info("✅ Counting game startup complete!")
             except Exception as e:
                 logger.error(f"Failed to send startup message: {e}")
@@ -123,14 +119,9 @@ class CountingGame(commands.Cog):
         state = self.database.get_game_state()
         if state:
             self.current_count, self.target_number, self.last_counter = state
-            # If we loaded a -1 state, treat it as a new game
-            if self.current_count == -1:
-                self.current_count = 0
-                self.last_counter = None
-                self._save_game_state()
         else:
             # Initialize game state
-            self.current_count = 0
+            self.current_count = -1  # Start as a new game
             self.target_number = self._generate_target()
             self.last_counter = None
             self._save_game_state()
