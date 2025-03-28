@@ -136,8 +136,11 @@ class CountingGame(commands.Cog):
         )
 
     def _record_win(self, user_id):
-        """Record a win for the user."""
-        self.database.record_win(user_id)
+        """Record a win for the user and update their streak."""
+        # Reset all other players' streaks
+        self.database.reset_other_streaks(user_id)
+        # Increment this player's streak and wins
+        self.database.record_win_and_increment_streak(user_id)
 
     def _get_rank_info(self, wins):
         """Get title, color, and progress info based on win count."""
@@ -181,12 +184,12 @@ class CountingGame(commands.Cog):
 
     async def _show_leaderboard(self, channel):
         """Create and return the leaderboard embed."""
-        leaders = self.database.get_leaderboard()
+        leaders = self.database.get_leaderboard_with_streaks()
 
         if not leaders:
             return "No winners yet!"
 
-        total_games = sum(wins for _, wins in leaders)
+        total_games = sum(wins for _, wins, _ in leaders)
         top_title, top_color, _, _ = self._get_rank_info(leaders[0][1] if leaders else 0)
 
         embed = discord.Embed(
@@ -198,7 +201,7 @@ class CountingGame(commands.Cog):
         # Medal emojis for top 3
         medals = ["🥇", "🥈", "🥉"]
 
-        for i, (user_id, wins) in enumerate(leaders, 1):
+        for i, (user_id, wins, streak) in enumerate(leaders, 1):
             try:
                 user = await self.bot.fetch_user(user_id)
                 name = user.name if user else f"Unknown User ({user_id})"
@@ -218,7 +221,7 @@ class CountingGame(commands.Cog):
             value = (
                 f"**{title}**\n"
                 f"`{progress_bar}` {wins}/{next_threshold} wins ({progress:.1f}%)\n"
-                f"{'🔥 On Fire!' if wins >= 3 else ''}"
+                f"{'🔥 On Fire!' if streak >= 3 else ''}"  # streak is now from database
             )
             
             embed.add_field(
