@@ -67,8 +67,10 @@ class CountingGame(commands.Cog):
                 
         try:
             await self.counting_channel.send(self._get_random_spawn_gif())
+            # Don't show -1, instead indicate new game starting at 0
             await self.counting_channel.send(
-                f"Last number counted: `{self.current_count}`"
+                "New game starting! Begin counting at 0!" if self.current_count == -1 
+                else f"Last number counted: `{self.current_count}`"
             )
             logger.info("✅ Game status announced successfully")
             return True
@@ -118,8 +120,13 @@ class CountingGame(commands.Cog):
     def _load_game_state(self):
         """Load game state from database."""
         state = self.database.get_game_state()
-        if (state):
+        if state:
             self.current_count, self.target_number, self.last_counter = state
+            # If we loaded a -1 state, treat it as a new game
+            if self.current_count == -1:
+                self.current_count = 0
+                self.last_counter = None
+                self._save_game_state()
         else:
             # Initialize game state
             self.current_count = 0
