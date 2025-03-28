@@ -182,6 +182,16 @@ class CountingGame(commands.Cog):
         empty = bar_length - filled
         return "█" * filled + "░" * empty
 
+    def _get_streak_message(self, streak: int, username: str) -> str:
+        """Get appropriate streak message based on streak count."""
+        if streak == 2:
+            return f"🌟 {username} is heating up!"
+        elif streak == 3:
+            return f"🔥 {username} is ON FIRE!"
+        elif streak > 3:
+            return f"🔥 {username}'s winning streak: {streak} in a row!"
+        return ""
+
     async def _show_leaderboard(self, channel):
         """Create and return the leaderboard embed."""
         leaders = self.database.get_leaderboard_with_streaks()
@@ -221,7 +231,7 @@ class CountingGame(commands.Cog):
             value = (
                 f"**{title}**\n"
                 f"`{progress_bar}` {wins}/{next_threshold} wins ({progress:.1f}%)\n"
-                f"{'🔥 On Fire!' if streak >= 3 else ''}"  # streak is now from database
+                f"{'🔥 On Fire! (' + str(streak) + ' streak)' if streak >= 3 else ''}"
             )
             
             embed.add_field(
@@ -279,6 +289,14 @@ class CountingGame(commands.Cog):
             await message.channel.send(self._get_random_goose_gif())
             await message.channel.send("🦢 HONK HONK! We have a winner!")
             await message.channel.send(f"Congratulations {message.author.mention}, you are now the holder of the Silly Goose! 🎉")
+            
+            # Get current streak and show streak message if applicable
+            results = self.database.get_leaderboard_with_streaks(1)
+            if results and len(results) > 0:
+                _, _, streak = results[0]  # Get streak of top player (current winner)
+                streak_msg = self._get_streak_message(streak, message.author.name)
+                if streak_msg:
+                    await message.channel.send(streak_msg)
             
             leaderboard = await self._show_leaderboard(message.channel)
             await message.channel.send(
