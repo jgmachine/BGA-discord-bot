@@ -67,9 +67,10 @@ class CountingGame(commands.Cog):
                 
         try:
             await self.counting_channel.send(self._get_random_spawn_gif())
-            await self.counting_channel.send(
-                f"Last number counted: `{self.current_count}`"
-            )
+            # Show "start at 0" message when current_count is -1
+            message = ("🎲 New game starting! Begin counting at 0!" if self.current_count == -1 
+                      else f"Last number counted: `{self.current_count}`")
+            await self.counting_channel.send(message)
             logger.info("✅ Game status announced successfully")
             return True
         except Exception as e:
@@ -91,18 +92,16 @@ class CountingGame(commands.Cog):
                 logger.error(f"❌ Could not find counting channel with ID: {self.config.counting_channel_id}")
                 return
 
-            # Force reload game state after ensuring tables exist
             logger.info("Loading game state...")
             self._load_game_state()
             self.ready = True
             
             logger.info("Sending startup message...")
             try:
-                await self.counting_channel.send(
-                    f"🎲 **Counting Game is Ready!**\n"
-                    f"Current count: `{self.current_count}`\n"
-                    f"{self._get_random_spawn_gif()}"
-                )
+                message = ("🎲 **Counting Game is Ready!**\n"
+                          "New game starting! Begin counting at 0!\n")
+                await self.counting_channel.send(message)
+                await self.counting_channel.send(self._get_random_spawn_gif())
                 logger.info("✅ Counting game startup complete!")
             except Exception as e:
                 logger.error(f"Failed to send startup message: {e}")
@@ -118,11 +117,11 @@ class CountingGame(commands.Cog):
     def _load_game_state(self):
         """Load game state from database."""
         state = self.database.get_game_state()
-        if (state):
+        if state:
             self.current_count, self.target_number, self.last_counter = state
         else:
             # Initialize game state
-            self.current_count = 0
+            self.current_count = -1  # Start as a new game
             self.target_number = self._generate_target()
             self.last_counter = None
             self._save_game_state()
@@ -136,8 +135,11 @@ class CountingGame(commands.Cog):
         )
 
     def _record_win(self, user_id):
-        """Record a win for the user."""
-        self.database.record_win(user_id)
+        """Record a win for the user and update their streak."""
+        # Reset all other players' streaks
+        self.database.reset_other_streaks(user_id)
+        # Increment this player's streak and wins
+        self.database.record_win_and_increment_streak(user_id)
 
     def _get_rank_info(self, wins):
         """Get title, color, and progress info based on win count."""
@@ -179,14 +181,24 @@ class CountingGame(commands.Cog):
         empty = bar_length - filled
         return "█" * filled + "░" * empty
 
+    def _get_streak_message(self, streak: int, username: str) -> str:
+        """Get appropriate streak message based on streak count."""
+        if streak == 2:
+            return f"🌟 {username} is heating up!"
+        elif streak == 3:
+            return f"🔥 {username} is ON FIRE!"
+        elif streak > 3:
+            return f"🔥 {username}'s winning streak: {streak} in a row!"
+        return ""
+
     async def _show_leaderboard(self, channel):
         """Create and return the leaderboard embed."""
-        leaders = self.database.get_leaderboard()
+        leaders = self.database.get_leaderboard_with_streaks()
 
         if not leaders:
             return "No winners yet!"
 
-        total_games = sum(wins for _, wins in leaders)
+        total_games = sum(wins for _, wins, _ in leaders)
         top_title, top_color, _, _ = self._get_rank_info(leaders[0][1] if leaders else 0)
 
         embed = discord.Embed(
@@ -198,7 +210,7 @@ class CountingGame(commands.Cog):
         # Medal emojis for top 3
         medals = ["🥇", "🥈", "🥉"]
 
-        for i, (user_id, wins) in enumerate(leaders, 1):
+        for i, (user_id, wins, streak) in enumerate(leaders, 1):
             try:
                 user = await self.bot.fetch_user(user_id)
                 name = user.name if user else f"Unknown User ({user_id})"
@@ -218,7 +230,7 @@ class CountingGame(commands.Cog):
             value = (
                 f"**{title}**\n"
                 f"`{progress_bar}` {wins}/{next_threshold} wins ({progress:.1f}%)\n"
-                f"{'🔥 On Fire!' if wins >= 3 else ''}"
+                f"{'🔥 On Fire! (' + str(streak) + ' streak)' if streak >= 3 else ''}"
             )
             
             embed.add_field(
@@ -276,6 +288,14 @@ class CountingGame(commands.Cog):
             await message.channel.send(self._get_random_goose_gif())
             await message.channel.send("🦢 HONK HONK! We have a winner!")
             await message.channel.send(f"Congratulations {message.author.mention}, you are now the holder of the Silly Goose! 🎉")
+            
+            # Get current streak and show streak message if applicable
+            results = self.database.get_leaderboard_with_streaks(1)
+            if results and len(results) > 0:
+                _, _, streak = results[0]  # Get streak of top player (current winner)
+                streak_msg = self._get_streak_message(streak, message.author.name)
+                if streak_msg:
+                    await message.channel.send(streak_msg)
             
             leaderboard = await self._show_leaderboard(message.channel)
             await message.channel.send(
