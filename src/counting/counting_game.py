@@ -289,10 +289,10 @@ class CountingGame(commands.Cog):
             await message.channel.send("🦢 HONK HONK! We have a winner!")
             await message.channel.send(f"Congratulations {message.author.mention}, you are now the holder of the Silly Goose! 🎉")
             
-            # Get current streak and show streak message if applicable
+            # Get current streak and show streak message BEFORE leaderboard
             results = self.database.get_leaderboard_with_streaks(1)
             if results and len(results) > 0:
-                _, _, streak = results[0]  # Get streak of top player (current winner)
+                _, _, streak = results[0]
                 streak_msg = self._get_streak_message(streak, message.author.name)
                 if streak_msg:
                     await message.channel.send(streak_msg)
