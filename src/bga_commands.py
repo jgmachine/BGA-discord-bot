@@ -61,11 +61,16 @@ class BGACommands(commands.Cog):
     @app_commands.describe(bga_id="Your Board Game Arena username")
     async def bga_link(self, interaction: discord.Interaction, bga_id: str):
         try:
-            database.insert_user_data(discordId=interaction.user.id, bgaId=bga_id)
+            # Use instance database instead of global
+            self.database.insert_user_data(interaction.user.id, bga_id)
             await interaction.response.send_message(f"Successfully linked to BGA account: {bga_id}")
-        except sqlite3.IntegrityError as e:
-            logging.error(f"Error when linking BGA account: {e}")
-            await interaction.response.send_message("This Discord account is already linked to a BGA account!")
+            logging.info(f"User {interaction.user.id} linked to BGA account {bga_id}")
+        except sqlite3.IntegrityError:
+            await interaction.response.send_message("This Discord account or BGA ID is already linked!", ephemeral=True)
+            logging.warning(f"Failed to link user {interaction.user.id} - already exists")
+        except Exception as e:
+            await interaction.response.send_message("An error occurred while linking your account. Please try again.", ephemeral=True)
+            logging.error(f"Error linking BGA account: {e}")
 
     @app_commands.command(name="bga_users", description="Show all linked BGA users (debug)")
     async def bga_users(self, interaction: discord.Interaction):
