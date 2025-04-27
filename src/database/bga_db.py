@@ -19,13 +19,16 @@ class BGADatabase(BaseDatabase):
         """)
         
         # Check if dm_enabled column exists
-        cursor = self._execute("PRAGMA table_info(user_data)")
-        columns = [row[1] for row in cursor.fetchall()]
+        results = self._execute("PRAGMA table_info(user_data)")
+        columns = [row[1] for row in results] if results else []
         
         # Add dm_enabled column if it doesn't exist
         if 'dm_enabled' not in columns:
-            self._execute("ALTER TABLE user_data ADD COLUMN dm_enabled INTEGER DEFAULT 0")
-            logging.info("[DATABASE] Added dm_enabled column to user_data table")
+            try:
+                self._execute("ALTER TABLE user_data ADD COLUMN dm_enabled INTEGER DEFAULT 0")
+                logging.info("[DATABASE] Added dm_enabled column to user_data table")
+            except Exception as e:
+                logging.error(f"[DATABASE] Error adding dm_enabled column: {e}")
         
         # Create game_data table
         self._execute("""
