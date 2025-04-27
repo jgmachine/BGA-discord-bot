@@ -143,16 +143,17 @@ class BGACommands(commands.Cog):
             )
             logging.error(f"Error fetching user settings: {e}")
 
-    @app_commands.command(name="bga_dm", description="Enable or disable DM notifications for your BGA turns")
-    @app_commands.describe(setting="Choose whether to enable or disable DM notifications")
+    @app_commands.command(name="bga_notifications", description="Set your notification preferences for BGA turns")
+    @app_commands.describe(setting="Choose how you want to receive notifications")
     @app_commands.choices(setting=[
-        app_commands.Choice(name="Enable DMs", value="enable"),
-        app_commands.Choice(name="Disable DMs", value="disable")
+        app_commands.Choice(name="Channel only", value="channel"),
+        app_commands.Choice(name="DM only", value="dm"),
+        app_commands.Choice(name="Both Channel and DM", value="both"),
+        app_commands.Choice(name="Disabled", value="none")
     ])
-    async def bga_dm(self, interaction: discord.Interaction, setting: app_commands.Choice[str]):
-        """Set DM notification preference for BGA turns"""
+    async def bga_notifications(self, interaction: discord.Interaction, setting: app_commands.Choice[str]):
+        """Set notification preferences for BGA turns"""
         try:
-            # Check if user exists in database
             settings = self.database.get_user_settings(interaction.user.id)
             if not settings:
                 await interaction.response.send_message(
@@ -161,24 +162,26 @@ class BGACommands(commands.Cog):
                 )
                 return
 
-            enable = setting.value == "enable"
-            self.database.set_dm_preference(interaction.user.id, enable)
-            status = "enabled" if enable else "disabled"
+            # Convert setting to boolean flags
+            channel = setting.value in ("channel", "both")
+            dm = setting.value in ("dm", "both")
+            
+            self.database.set_notification_preferences(interaction.user.id, channel, dm)
             
             embed = discord.Embed(
-                title="🔔 DM Notification Settings Updated",
-                description=f"DM notifications have been {status}!",
-                color=discord.Color.green() if enable else discord.Color.red()
+                title="🔔 Notification Settings Updated",
+                description=f"Notifications set to: {setting.name}",
+                color=discord.Color.green()
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
-            logging.info(f"User {interaction.user.id} {status} DM notifications")
+            logging.info(f"User {interaction.user.id} updated notification settings to {setting.value}")
 
         except Exception as e:
             await interaction.response.send_message(
                 "An error occurred while updating your preferences.", 
                 ephemeral=True
             )
-            logging.error(f"Error updating DM preferences: {e}")
+            logging.error(f"Error updating notification preferences: {e}")
 
 async def notify_turn(bot, bga_id, game_id):
     """Notify a user that it's their turn in a BGA game."""
@@ -186,30 +189,36 @@ async def notify_turn(bot, bga_id, game_id):
 
     discord_id = database.get_discord_id_by_bga_id(bga_id)
     if discord_id:
-        discord_id = int(discord_id)  # Ensure discord_id is an integer
-        user = await bot.fetch_user(discord_id)  # Use fetch_user instead of get_user
+        discord_id = int(discord_id)
+        user = await bot.fetch_user(discord_id)
         if not user:
             logging.error(f"Could not fetch user with ID {discord_id}")
             return
 
-        mention = f"<@{discord_id}>"
-        channel = bot.get_channel(NOTIFY_CHANNEL_ID)
         game = database.get_game_by_id(game_id)
+        prefs = database.get_notification_preferences(discord_id)
         
-        # Send channel notification
-        try:
-            await channel.send(
-                f"🎲 It's your turn {mention} in [{game.name}]({game.url})!"
-            )
-            logging.info("Turn notification sent to channel successfully")
-        except Exception as e:
-            logging.error(f"Failed to send channel notification: {e}")
+        if not prefs:
+            logging.error(f"No notification preferences found for user {discord_id}")
+            return
 
-        # Check DM preference and send DM if enabled
-        if database.get_dm_preference(discord_id):
+        # Send channel notification if enabled
+        if prefs['channel_enabled']:
+            try:
+                channel = bot.get_channel(NOTIFY_CHANNEL_ID)
+                mention = f"<@{discord_id}>"
+                await channel.send(
+                    f"🎲 It's your turn {mention} in [{game.name}]({game.url})!"
+                )
+                logging.info("Turn notification sent to channel successfully")
+            except Exception as e:
+                logging.error(f"Failed to send channel notification: {e}")
+
+        # Send DM if enabled
+        if prefs['dm_enabled']:
             logging.info(f"Attempting to send DM to user {discord_id}")
             try:
-                dm_channel = await user.create_dm()  # Create DM channel explicitly
+                dm_channel = await user.create_dm()
                 await dm_channel.send(
                     f"🎲 It's your turn in [{game.name}]({game.url})!"
                 )

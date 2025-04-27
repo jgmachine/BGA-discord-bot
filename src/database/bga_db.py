@@ -18,17 +18,18 @@ class BGADatabase(BaseDatabase):
             )
         """)
         
-        # Check if dm_enabled column exists
+        # Check if notification columns exist
         results = self._execute("PRAGMA table_info(user_data)")
         columns = [row[1] for row in results] if results else []
         
-        # Add dm_enabled column if it doesn't exist
+        # Add notification columns if they don't exist
         if 'dm_enabled' not in columns:
-            try:
-                self._execute("ALTER TABLE user_data ADD COLUMN dm_enabled INTEGER DEFAULT 0")
-                logging.info("[DATABASE] Added dm_enabled column to user_data table")
-            except Exception as e:
-                logging.error(f"[DATABASE] Error adding dm_enabled column: {e}")
+            self._execute("ALTER TABLE user_data ADD COLUMN dm_enabled INTEGER DEFAULT 0")
+            logging.info("[DATABASE] Added dm_enabled column")
+            
+        if 'channel_enabled' not in columns:
+            self._execute("ALTER TABLE user_data ADD COLUMN channel_enabled INTEGER DEFAULT 1")
+            logging.info("[DATABASE] Added channel_enabled column")
         
         # Create game_data table
         self._execute("""
@@ -41,25 +42,31 @@ class BGADatabase(BaseDatabase):
         """)
         logging.info("[DATABASE] BGA tables checked/created successfully.")
 
-    def set_dm_preference(self, discord_id: int, enabled: bool):
-        """Set DM preference for a user."""
+    def set_notification_preferences(self, discord_id: int, channel: bool, dm: bool):
+        """Set notification preferences for a user."""
         if not self.get_user_settings(discord_id):
-            logging.warning(f"[DATABASE] User {discord_id} does not exist. DM preference not set.")
-            return
+            logging.warning(f"[DATABASE] User {discord_id} does not exist. Preferences not set.")
+            return False
         
         self._execute(
-            "UPDATE user_data SET dm_enabled = ? WHERE discord_id = ?",
-            (1 if enabled else 0, discord_id)
+            "UPDATE user_data SET channel_enabled = ?, dm_enabled = ? WHERE discord_id = ?",
+            (1 if channel else 0, 1 if dm else 0, discord_id)
         )
-        logging.info(f"[DATABASE] User {discord_id} DM preference set to {enabled}")
+        logging.info(f"[DATABASE] User {discord_id} notification preferences updated: channel={channel}, dm={dm}")
+        return True
 
-    def get_dm_preference(self, discord_id: int) -> bool:
-        """Get DM preference for a user."""
+    def get_notification_preferences(self, discord_id: int):
+        """Get notification preferences for a user."""
         results = self._execute(
-            "SELECT dm_enabled FROM user_data WHERE discord_id = ?",
+            "SELECT channel_enabled, dm_enabled FROM user_data WHERE discord_id = ?",
             (discord_id,)
         )
-        return bool(results[0][0]) if results else False
+        if not results:
+            return None
+        return {
+            'channel_enabled': bool(results[0][0]),
+            'dm_enabled': bool(results[0][1])
+        }
 
     # User Management
     def insert_user_data(self, discord_id, bga_id):
@@ -94,14 +101,15 @@ class BGADatabase(BaseDatabase):
     def get_user_settings(self, discord_id: int):
         """Get all settings for a user."""
         results = self._execute(
-            "SELECT bga_id, dm_enabled FROM user_data WHERE discord_id = ?",
+            "SELECT bga_id, channel_enabled, dm_enabled FROM user_data WHERE discord_id = ?",
             (discord_id,)
         )
         if not results:
             return None
         return {
             'bga_id': results[0][0],
-            'dm_enabled': bool(results[0][1])
+            'channel_enabled': bool(results[0][1]),
+            'dm_enabled': bool(results[0][2])
         }
 
     # Game Management
