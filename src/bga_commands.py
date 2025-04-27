@@ -108,14 +108,18 @@ class BGACommands(commands.Cog):
             await interaction.response.send_message(f"Database error: {e}")
             logging.error(f"Database error: {e}")
 
-    @app_commands.command(name="bga_enable_dm", description="Toggle DM notifications for your BGA turns")
-    async def bga_enable_dm(self, interaction: discord.Interaction):
-        """Toggle DM notifications for BGA turns"""
+    @app_commands.command(name="bga_dm", description="Enable or disable DM notifications for your BGA turns")
+    @app_commands.describe(setting="Choose whether to enable or disable DM notifications")
+    @app_commands.choices(setting=[
+        app_commands.Choice(name="Enable DMs", value="enable"),
+        app_commands.Choice(name="Disable DMs", value="disable")
+    ])
+    async def bga_dm(self, interaction: discord.Interaction, setting: app_commands.Choice[str]):
+        """Set DM notification preference for BGA turns"""
         try:
-            current_pref = self.database.get_dm_preference(interaction.user.id)
-            new_pref = not current_pref
-            self.database.set_dm_preference(interaction.user.id, new_pref)
-            status = "enabled" if new_pref else "disabled"
+            enable = setting.value == "enable"
+            self.database.set_dm_preference(interaction.user.id, enable)
+            status = "enabled" if enable else "disabled"
             await interaction.response.send_message(
                 f"DM notifications have been {status}!", 
                 ephemeral=True

@@ -9,14 +9,25 @@ class BGADatabase(BaseDatabase):
     """BGA-specific database operations."""
 
     def create_tables(self):
-        """Creates BGA-related tables."""
+        """Creates BGA-related tables and handles migrations."""
+        # First create tables if they don't exist
         self._execute("""
             CREATE TABLE IF NOT EXISTS user_data (
                 discord_id INTEGER PRIMARY KEY,
-                bga_id TEXT UNIQUE NOT NULL,
-                dm_enabled BOOLEAN DEFAULT 0
+                bga_id TEXT UNIQUE NOT NULL
             )
         """)
+        
+        # Check if dm_enabled column exists
+        cursor = self._execute("PRAGMA table_info(user_data)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        # Add dm_enabled column if it doesn't exist
+        if 'dm_enabled' not in columns:
+            self._execute("ALTER TABLE user_data ADD COLUMN dm_enabled INTEGER DEFAULT 0")
+            logging.info("[DATABASE] Added dm_enabled column to user_data table")
+        
+        # Create game_data table
         self._execute("""
             CREATE TABLE IF NOT EXISTS game_data (
                 id INTEGER PRIMARY KEY,
