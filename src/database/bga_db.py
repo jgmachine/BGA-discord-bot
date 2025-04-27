@@ -13,7 +13,8 @@ class BGADatabase(BaseDatabase):
         self._execute("""
             CREATE TABLE IF NOT EXISTS user_data (
                 discord_id INTEGER PRIMARY KEY,
-                bga_id TEXT UNIQUE NOT NULL
+                bga_id TEXT UNIQUE NOT NULL,
+                dm_enabled BOOLEAN DEFAULT 0
             )
         """)
         self._execute("""
@@ -25,6 +26,22 @@ class BGADatabase(BaseDatabase):
             )
         """)
         logging.info("[DATABASE] BGA tables checked/created successfully.")
+
+    def set_dm_preference(self, discord_id: int, enabled: bool):
+        """Set DM preference for a user."""
+        self._execute(
+            "UPDATE user_data SET dm_enabled = ? WHERE discord_id = ?",
+            (1 if enabled else 0, discord_id)
+        )
+        logging.info(f"[DATABASE] User {discord_id} DM preference set to {enabled}")
+
+    def get_dm_preference(self, discord_id: int) -> bool:
+        """Get DM preference for a user."""
+        results = self._execute(
+            "SELECT dm_enabled FROM user_data WHERE discord_id = ?",
+            (discord_id,)
+        )
+        return bool(results[0][0]) if results else False
 
     # User Management
     def insert_user_data(self, discord_id, bga_id):

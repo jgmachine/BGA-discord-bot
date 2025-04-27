@@ -108,23 +108,57 @@ class BGACommands(commands.Cog):
             await interaction.response.send_message(f"Database error: {e}")
             logging.error(f"Database error: {e}")
 
+    @app_commands.command(name="bga_enable_dm", description="Toggle DM notifications for your BGA turns")
+    async def bga_enable_dm(self, interaction: discord.Interaction):
+        """Toggle DM notifications for BGA turns"""
+        try:
+            current_pref = self.database.get_dm_preference(interaction.user.id)
+            new_pref = not current_pref
+            self.database.set_dm_preference(interaction.user.id, new_pref)
+            status = "enabled" if new_pref else "disabled"
+            await interaction.response.send_message(
+                f"DM notifications have been {status}!", 
+                ephemeral=True
+            )
+            logging.info(f"User {interaction.user.id} {status} DM notifications")
+        except Exception as e:
+            await interaction.response.send_message(
+                "An error occurred while updating your preferences.", 
+                ephemeral=True
+            )
+            logging.error(f"Error updating DM preferences: {e}")
+
 async def notify_turn(bot, bga_id, game_id):
     """Notify a user that it's their turn in a BGA game."""
     logging.info(f"Notifying turn for BGA game {game_id}, player {bga_id}")
 
     discord_id = database.get_discord_id_by_bga_id(bga_id)
-    if (discord_id):
+    if discord_id:
+        user = bot.get_user(discord_id)
         mention = f"<@{discord_id}>"
         channel = bot.get_channel(NOTIFY_CHANNEL_ID)
         game = database.get_game_by_id(game_id)
-
+        
+        # Send channel notification
         try:
             await channel.send(
                 f"🎲 It's your turn {mention} in [{game.name}]({game.url})!"
             )
-            logging.info("Turn notification sent successfully")
+            logging.info("Turn notification sent to channel successfully")
         except Exception as e:
-            logging.error(f"Failed to send turn notification: {e}")
+            logging.error(f"Failed to send channel notification: {e}")
+
+        # Check DM preference and send DM if enabled
+        if database.get_dm_preference(discord_id):
+            try:
+                await user.send(
+                    f"🎲 It's your turn in [{game.name}]({game.url})!"
+                )
+                logging.info("Turn notification sent via DM successfully")
+            except discord.Forbidden:
+                logging.error("Could not send DM - user has DMs disabled")
+            except Exception as e:
+                logging.error(f"Failed to send DM notification: {e}")
 
 async def setup(bot):
     await bot.add_cog(BGACommands(bot))
