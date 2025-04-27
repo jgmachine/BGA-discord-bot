@@ -186,7 +186,12 @@ async def notify_turn(bot, bga_id, game_id):
 
     discord_id = database.get_discord_id_by_bga_id(bga_id)
     if discord_id:
-        user = bot.get_user(discord_id)
+        discord_id = int(discord_id)  # Ensure discord_id is an integer
+        user = await bot.fetch_user(discord_id)  # Use fetch_user instead of get_user
+        if not user:
+            logging.error(f"Could not fetch user with ID {discord_id}")
+            return
+
         mention = f"<@{discord_id}>"
         channel = bot.get_channel(NOTIFY_CHANNEL_ID)
         game = database.get_game_by_id(game_id)
@@ -202,13 +207,15 @@ async def notify_turn(bot, bga_id, game_id):
 
         # Check DM preference and send DM if enabled
         if database.get_dm_preference(discord_id):
+            logging.info(f"Attempting to send DM to user {discord_id}")
             try:
-                await user.send(
+                dm_channel = await user.create_dm()  # Create DM channel explicitly
+                await dm_channel.send(
                     f"🎲 It's your turn in [{game.name}]({game.url})!"
                 )
                 logging.info("Turn notification sent via DM successfully")
             except discord.Forbidden:
-                logging.error("Could not send DM - user has DMs disabled")
+                logging.error(f"Could not send DM - user {discord_id} has DMs disabled")
             except Exception as e:
                 logging.error(f"Failed to send DM notification: {e}")
 
