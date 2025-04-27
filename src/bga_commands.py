@@ -108,6 +108,41 @@ class BGACommands(commands.Cog):
             await interaction.response.send_message(f"Database error: {e}")
             logging.error(f"Database error: {e}")
 
+    @app_commands.command(name="bga_settings", description="Show your current BGA settings")
+    async def bga_settings(self, interaction: discord.Interaction):
+        """Show current user settings"""
+        try:
+            settings = self.database.get_user_settings(interaction.user.id)
+            if not settings:
+                await interaction.response.send_message(
+                    "You don't have any BGA settings configured yet. Use `/bga_link` to get started!", 
+                    ephemeral=True
+                )
+                return
+
+            embed = discord.Embed(
+                title="🎲 Your BGA Settings",
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="BGA Username", 
+                value=settings['bga_id'], 
+                inline=False
+            )
+            embed.add_field(
+                name="DM Notifications", 
+                value="✅ Enabled" if settings['dm_enabled'] else "❌ Disabled", 
+                inline=False
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            await interaction.response.send_message(
+                "An error occurred while fetching your settings.", 
+                ephemeral=True
+            )
+            logging.error(f"Error fetching user settings: {e}")
+
     @app_commands.command(name="bga_dm", description="Enable or disable DM notifications for your BGA turns")
     @app_commands.describe(setting="Choose whether to enable or disable DM notifications")
     @app_commands.choices(setting=[
@@ -117,14 +152,27 @@ class BGACommands(commands.Cog):
     async def bga_dm(self, interaction: discord.Interaction, setting: app_commands.Choice[str]):
         """Set DM notification preference for BGA turns"""
         try:
+            # Check if user exists in database
+            settings = self.database.get_user_settings(interaction.user.id)
+            if not settings:
+                await interaction.response.send_message(
+                    "You need to link your BGA account first using `/bga_link`!",
+                    ephemeral=True
+                )
+                return
+
             enable = setting.value == "enable"
             self.database.set_dm_preference(interaction.user.id, enable)
             status = "enabled" if enable else "disabled"
-            await interaction.response.send_message(
-                f"DM notifications have been {status}!", 
-                ephemeral=True
+            
+            embed = discord.Embed(
+                title="🔔 DM Notification Settings Updated",
+                description=f"DM notifications have been {status}!",
+                color=discord.Color.green() if enable else discord.Color.red()
             )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             logging.info(f"User {interaction.user.id} {status} DM notifications")
+
         except Exception as e:
             await interaction.response.send_message(
                 "An error occurred while updating your preferences.", 

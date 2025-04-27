@@ -43,6 +43,10 @@ class BGADatabase(BaseDatabase):
 
     def set_dm_preference(self, discord_id: int, enabled: bool):
         """Set DM preference for a user."""
+        if not self.get_user_settings(discord_id):
+            logging.warning(f"[DATABASE] User {discord_id} does not exist. DM preference not set.")
+            return
+        
         self._execute(
             "UPDATE user_data SET dm_enabled = ? WHERE discord_id = ?",
             (1 if enabled else 0, discord_id)
@@ -62,8 +66,8 @@ class BGADatabase(BaseDatabase):
         """Adds a new user to the database."""
         try:
             self._execute(
-                "INSERT INTO user_data (discord_id, bga_id) VALUES (?, ?)",
-                (discord_id, bga_id)
+                "INSERT INTO user_data (discord_id, bga_id, dm_enabled) VALUES (?, ?, ?)",
+                (discord_id, bga_id, 0)  # Default DM setting to disabled
             )
             logging.info(f"[DATABASE] User {discord_id} linked to BGA {bga_id}.")
         except sqlite3.IntegrityError:
@@ -86,6 +90,19 @@ class BGADatabase(BaseDatabase):
         """Retrieves all BGA IDs."""
         results = self._execute("SELECT bga_id FROM user_data")
         return [row[0] for row in results] if results else []
+
+    def get_user_settings(self, discord_id: int):
+        """Get all settings for a user."""
+        results = self._execute(
+            "SELECT bga_id, dm_enabled FROM user_data WHERE discord_id = ?",
+            (discord_id,)
+        )
+        if not results:
+            return None
+        return {
+            'bga_id': results[0][0],
+            'dm_enabled': bool(results[0][1])
+        }
 
     # Game Management
     def insert_game_data(self, id, url, game_name, active_player_id):
