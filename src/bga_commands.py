@@ -120,6 +120,15 @@ class BGACommands(commands.Cog):
                 )
                 return
 
+            # Get notification status
+            notification_status = "Disabled"
+            if settings.get('channel_enabled') and settings.get('dm_enabled'):
+                notification_status = "Channel and DM"
+            elif settings.get('channel_enabled'):
+                notification_status = "Channel only"
+            elif settings.get('dm_enabled'):
+                notification_status = "DM only"
+
             embed = discord.Embed(
                 title="🎲 Your BGA Settings",
                 color=discord.Color.blue()
@@ -130,10 +139,11 @@ class BGACommands(commands.Cog):
                 inline=False
             )
             embed.add_field(
-                name="DM Notifications", 
-                value="✅ Enabled" if settings['dm_enabled'] else "❌ Disabled", 
+                name="Notifications", 
+                value=notification_status,
                 inline=False
             )
+            embed.set_footer(text="Use /bga_notifications to update your notification preferences")
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
         except Exception as e:

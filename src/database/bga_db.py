@@ -40,7 +40,33 @@ class BGADatabase(BaseDatabase):
                 active_player_id INTEGER
             )
         """)
+        
+        # Handle migration from old dm_enabled to new notification system
+        self._migrate_dm_preferences()
+        
         logging.info("[DATABASE] BGA tables checked/created successfully.")
+
+    def _migrate_dm_preferences(self):
+        """Migrate users from old dm_enabled to new notification system."""
+        try:
+            results = self._execute(
+                "SELECT discord_id, dm_enabled FROM user_data WHERE dm_enabled IS NOT NULL"
+            )
+            for discord_id, dm_enabled in results:
+                if dm_enabled:
+                    # If DMs were enabled, enable both channel and DM notifications
+                    self._execute(
+                        "UPDATE user_data SET channel_enabled = 1, dm_enabled = 1 WHERE discord_id = ?",
+                        (discord_id,)
+                    )
+                # Clear the old dm_enabled value
+                self._execute(
+                    "UPDATE user_data SET dm_enabled = NULL WHERE discord_id = ?",
+                    (discord_id,)
+                )
+            logging.info("[DATABASE] Successfully migrated DM preferences")
+        except Exception as e:
+            logging.error(f"[DATABASE] Error migrating DM preferences: {e}")
 
     def set_notification_preferences(self, discord_id: int, channel: bool, dm: bool):
         """Set notification preferences for a user."""
