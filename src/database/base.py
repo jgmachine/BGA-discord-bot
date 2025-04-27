@@ -72,20 +72,14 @@ class BaseDatabase:
         raise NotImplementedError("Subclasses must implement create_tables()")
 
     def _execute(self, sql, params=None):
-        """Execute SQL and return results before connection close."""
+        """Execute SQL and return results."""
         with self.transaction() as cursor:
             if params:
                 cursor.execute(sql, params)
             else:
                 cursor.execute(sql)
             try:
-                results = cursor.fetchall()
-                # If we got results, return them
-                return results
+                return cursor.fetchall()
             except sqlite3.OperationalError:
-                # For statements that don't return results (INSERT/UPDATE/DELETE)
-                # return the cursor for rowcount access
-                if cursor.rowcount >= 0:  # -1 means no rows affected
-                    return cursor
-                # For other cases (like CREATE TABLE), return empty list
+                # For statements that don't return results
                 return []

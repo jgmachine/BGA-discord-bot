@@ -108,23 +108,116 @@ class BGACommands(commands.Cog):
             await interaction.response.send_message(f"Database error: {e}")
             logging.error(f"Database error: {e}")
 
+    @app_commands.command(name="bga_settings", description="Show your current BGA settings")
+    async def bga_settings(self, interaction: discord.Interaction):
+        """Show current user settings"""
+        try:
+            settings = self.database.get_user_settings(interaction.user.id)
+            if not settings:
+                await interaction.response.send_message(
+                    "You don't have any BGA settings configured yet. Use `/bga_link` to get started!", 
+                    ephemeral=True
+                )
+                return
+
+            embed = discord.Embed(
+                title="🎲 Your BGA Settings",
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="BGA Username", 
+                value=settings['bga_id'], 
+                inline=False
+            )
+            embed.add_field(
+                name="DM Notifications", 
+                value="✅ Enabled" if settings['dm_enabled'] else "❌ Disabled", 
+                inline=False
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            await interaction.response.send_message(
+                "An error occurred while fetching your settings.", 
+                ephemeral=True
+            )
+            logging.error(f"Error fetching user settings: {e}")
+
+    @app_commands.command(name="bga_dm", description="Enable or disable DM notifications for your BGA turns")
+    @app_commands.describe(setting="Choose whether to enable or disable DM notifications")
+    @app_commands.choices(setting=[
+        app_commands.Choice(name="Enable DMs", value="enable"),
+        app_commands.Choice(name="Disable DMs", value="disable")
+    ])
+    async def bga_dm(self, interaction: discord.Interaction, setting: app_commands.Choice[str]):
+        """Set DM notification preference for BGA turns"""
+        try:
+            # Check if user exists in database
+            settings = self.database.get_user_settings(interaction.user.id)
+            if not settings:
+                await interaction.response.send_message(
+                    "You need to link your BGA account first using `/bga_link`!",
+                    ephemeral=True
+                )
+                return
+
+            enable = setting.value == "enable"
+            self.database.set_dm_preference(interaction.user.id, enable)
+            status = "enabled" if enable else "disabled"
+            
+            embed = discord.Embed(
+                title="🔔 DM Notification Settings Updated",
+                description=f"DM notifications have been {status}!",
+                color=discord.Color.green() if enable else discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            logging.info(f"User {interaction.user.id} {status} DM notifications")
+
+        except Exception as e:
+            await interaction.response.send_message(
+                "An error occurred while updating your preferences.", 
+                ephemeral=True
+            )
+            logging.error(f"Error updating DM preferences: {e}")
+
 async def notify_turn(bot, bga_id, game_id):
     """Notify a user that it's their turn in a BGA game."""
     logging.info(f"Notifying turn for BGA game {game_id}, player {bga_id}")
 
     discord_id = database.get_discord_id_by_bga_id(bga_id)
-    if (discord_id):
+    if discord_id:
+        discord_id = int(discord_id)  # Ensure discord_id is an integer
+        user = await bot.fetch_user(discord_id)  # Use fetch_user instead of get_user
+        if not user:
+            logging.error(f"Could not fetch user with ID {discord_id}")
+            return
+
         mention = f"<@{discord_id}>"
         channel = bot.get_channel(NOTIFY_CHANNEL_ID)
         game = database.get_game_by_id(game_id)
-
+        
+        # Send channel notification
         try:
             await channel.send(
                 f"🎲 It's your turn {mention} in [{game.name}]({game.url})!"
             )
-            logging.info("Turn notification sent successfully")
+            logging.info("Turn notification sent to channel successfully")
         except Exception as e:
-            logging.error(f"Failed to send turn notification: {e}")
+            logging.error(f"Failed to send channel notification: {e}")
+
+        # Check DM preference and send DM if enabled
+        if database.get_dm_preference(discord_id):
+            logging.info(f"Attempting to send DM to user {discord_id}")
+            try:
+                dm_channel = await user.create_dm()  # Create DM channel explicitly
+                await dm_channel.send(
+                    f"🎲 It's your turn in [{game.name}]({game.url})!"
+                )
+                logging.info("Turn notification sent via DM successfully")
+            except discord.Forbidden:
+                logging.error(f"Could not send DM - user {discord_id} has DMs disabled")
+            except Exception as e:
+                logging.error(f"Failed to send DM notification: {e}")
 
 async def setup(bot):
     await bot.add_cog(BGACommands(bot))
