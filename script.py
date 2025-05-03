@@ -68,20 +68,28 @@ class BGABot:
         
         @self.bot.event
         async def on_ready():
-            logging.info(f"✅ Logged in as {self.bot.user}")
-            await self._load_extensions()
-            taskService.processGames.start(self.bot)
-            
-            # Get the counting game cog and announce status
-            counting_game = self.bot.get_cog('CountingGame')
-            if counting_game:
-                await counting_game.announce_game_status()
-            
+            try:
+                # Initialize services first
+                await service_manager.init()
+                
+                logging.info(f"✅ Logged in as {self.bot.user}")
+                await self._load_extensions()
+                taskService.processGames.start(self.bot)
+                
+                counting_game = self.bot.get_cog('CountingGame')
+                if counting_game:
+                    await counting_game.announce_game_status()
+                    
+            except Exception as e:
+                logging.error(f"❌ Failed to initialize services: {e}")
+        
         try:
             await self.bot.start(self.config.discord_token)
         except Exception as e:
             logging.error(f"❌ Failed to start bot: {e}")
-            
+        finally:
+            await service_manager.cleanup()
+
     def run(self) -> None:
         """Run the bot application."""
         asyncio.run(self.start())

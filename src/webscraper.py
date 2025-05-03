@@ -6,19 +6,23 @@ import asyncio
 from bs4 import BeautifulSoup
 from datetime import datetime
 from . import utils
+from .services import service_manager
 
 # Constants for request handling
 TIMEOUT = aiohttp.ClientTimeout(total=10)  # 10 second timeout
 MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds between retries
 
-async def _make_request(url, session):
-    """Make HTTP request with retry logic."""
+async def _make_request(url):
+    """Make HTTP request with retry logic using shared session."""
     for attempt in range(MAX_RETRIES):
         try:
-            async with session.get(url, timeout=TIMEOUT) as response:
+            if not service_manager.http_session:
+                raise RuntimeError("HTTP session not initialized")
+                
+            async with service_manager.http_session.get(url, timeout=TIMEOUT) as response:
                 return await response.text()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        except Exception as e:
             if attempt == MAX_RETRIES - 1:  # Last attempt
                 logging.error(f"Failed to fetch {url} after {MAX_RETRIES} attempts: {e}")
                 raise
@@ -26,18 +30,16 @@ async def _make_request(url, session):
 
 async def fetchActivePlayer(url):
     """Fetch the active player ID from a BGA game URL."""
-    async with aiohttp.ClientSession() as session:
-        try:
-            r = await _make_request(url, session)
-            pattern = re.compile(r'"active_player":"(\d+)"')
-            result = pattern.search(r)
-            if result:
-                active_player_value = result.group(1)
-                return int(active_player_value)
-            return None
-        except Exception as e:
-            logging.error(f"Error fetching active player: {e}")
-            return None
+    try:
+        r = await _make_request(url)
+        pattern = re.compile(r'"active_player":"(\d+)"')
+        result = pattern.search(r)
+        if result:
+            return int(result.group(1))
+        return None
+    except Exception as e:
+        logging.error(f"Error fetching active player: {e}")
+        return None
 
 async def checkIfGameEnded(url):
     """Check if a BGA game has ended."""
