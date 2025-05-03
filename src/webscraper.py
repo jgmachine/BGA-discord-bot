@@ -79,7 +79,23 @@ async def scrape_aftergame_event(url):
         r = await _make_request(url)
         soup = BeautifulSoup(r, 'html.parser')
         
-        # Find the Remix context script
+        # Find the number of attendees from the HTML
+        going_text = None
+        going_elements = soup.find_all('p', class_='mantine-Text-root')
+        for element in going_elements:
+            if 'going' in element.text:
+                going_text = element.text.strip()
+                break
+
+        going_count = 0
+        if going_text:
+            # Extract number from text like "9 going"
+            try:
+                going_count = int(''.join(filter(str.isdigit, going_text)))
+            except ValueError:
+                logging.warning(f"Could not parse going count from text: {going_text}")
+        
+        # Find the Remix context script for other event data
         scripts = soup.find_all('script')
         event_data = None
         
@@ -87,30 +103,41 @@ async def scrape_aftergame_event(url):
             if script.string and 'window.__remixContext' in script.string:
                 json_str = script.string.split('window.__remixContext = ')[1].split(';')[0]
                 data = json.loads(json_str)
-                event_data = data['state']['loaderData']['routes/events.$id']['event']
+                
+                # Debug log the raw data structure
+                logging.debug(f"Raw event data: {data}")
+                
+                try:
+                    event_data = data['state']['loaderData']['routes/events.$id']['event']
+                except KeyError as e:
+                    logging.error(f"Failed to extract event data, missing key: {e}")
+                    logging.debug(f"Available keys: {data.keys()}")
+                    return None
                 break
 
         if not event_data:
             raise Exception("Could not find event data in page")
 
+        # Extract data with fallbacks for missing fields
         event = {
             'url': url,
-            'name': event_data['name'],
-            'date': datetime.fromisoformat(event_data['startAt'].replace('Z', '+00:00')),
-            'venue': event_data['location']['name'] if event_data['location'] else None,
+            'name': event_data.get('name', 'Unnamed Event'),
+            'date': datetime.fromisoformat(event_data.get('startAt', datetime.now().isoformat()).replace('Z', '+00:00')),
+            'venue': event_data.get('location', {}).get('name'),
             'address': ', '.join(filter(None, [
-                event_data['location'].get('addressLine1'),
-                event_data['location'].get('addressLine2'),
-                event_data['location'].get('city'),
-                event_data['location'].get('region'),
-                event_data['location'].get('postalCode')
-            ])) if event_data['location'] else None,
-            'going_count': event_data['playersCount'],
-            'description': event_data['description'],
-            'image_url': event_data['imageUrl']
+                event_data.get('location', {}).get('addressLine1'),
+                event_data.get('location', {}).get('addressLine2'),
+                event_data.get('location', {}).get('city'),
+                event_data.get('location', {}).get('region'),
+                event_data.get('location', {}).get('postalCode')
+            ])) if event_data.get('location') else None,
+            'going_count': going_count,  # Use parsed count from HTML
+            'description': event_data.get('description', ''),
+            'image_url': event_data.get('imageUrl')
         }
         return event
 
     except Exception as e:
         logging.error(f"Error scraping Aftergame event {url}: {str(e)}")
+        logging.debug("Full error details:", exc_info=True)
         return None
