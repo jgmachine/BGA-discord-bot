@@ -5,6 +5,7 @@ import discord
 from discord.ext import commands
 from src.database import Database
 from src import taskService
+from src.services import service_manager  # Add this import
 import asyncio
 from pathlib import Path
 from typing import Optional
