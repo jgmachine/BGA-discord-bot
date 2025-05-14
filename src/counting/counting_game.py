@@ -308,7 +308,7 @@ class CountingGame(commands.Cog):
             # Keep last_counter to prevent winner from starting next round
             await message.channel.send("New round starting! I'm a computer, so start at 0!")
         else:
-            await message.add_reaction("✅")
+            await message.add_reaction("🦆")
         
         self._save_game_state()
 
