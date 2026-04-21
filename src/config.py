@@ -32,8 +32,14 @@ class Config:
 
         database_path = data_dir / "database.db"
 
+        discord_token = os.getenv("DISCORD_TOKEN", "")
+        if not discord_token:
+            raise ValueError(
+                "DISCORD_TOKEN is not set. The bot cannot start without it."
+            )
+
         return cls(
-            discord_token=os.getenv("DISCORD_TOKEN", ""),
+            discord_token=discord_token,
             discord_app_id=os.getenv("DISCORD_APP_ID"),
             notify_channel_id=int(os.getenv("NOTIFY_CHANNEL_ID", "0")),
             hosting_rotation_channel_id=int(os.getenv("HOSTING_ROTATION_CHANNEL_ID", "0")),

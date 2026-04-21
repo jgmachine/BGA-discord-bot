@@ -239,6 +239,10 @@ async def notify_turn(bot, bga_id, game_id):
                 logging.error(f"Failed to send DM notification: {e}")
 
 async def setup(bot):
+    cfg = Config.load()
+    if not cfg.notify_channel_id:
+        raise RuntimeError(
+            "NOTIFY_CHANNEL_ID is not set; BGA turn notifications cannot be delivered."
+        )
     await bot.add_cog(BGACommands(bot))
-    await bot.tree.sync()
-    logging.info("✅ BGA commands loaded and synced")
+    logging.info("✅ BGA commands loaded")

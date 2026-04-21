@@ -51,16 +51,26 @@ class BGABot:
         )
         
     async def _load_extensions(self) -> None:
-        """Load bot command extensions."""
+        """Load bot command extensions. Failure of one does not block others."""
+        extensions = [
+            "src.hosting_rotation",
+            "src.bga_commands",
+            "src.counting.counting_game",
+            "src.events",
+        ]
+        loaded = 0
+        for ext in extensions:
+            try:
+                await self.bot.load_extension(ext)
+                loaded += 1
+            except Exception as e:
+                logging.warning(f"⚠️  Skipping extension {ext}: {e}")
+
         try:
-            await self.bot.load_extension("src.hosting_rotation")
-            await self.bot.load_extension("src.bga_commands")
-            await self.bot.load_extension("src.counting.counting_game")
-            await self.bot.load_extension("src.events")  # Updated path
             await self.bot.tree.sync()
-            logging.info("✅ Extensions loaded and commands synced successfully.")
+            logging.info(f"✅ {loaded}/{len(extensions)} extensions loaded and commands synced.")
         except Exception as e:
-            logging.error(f"❌ Failed to load extensions: {e}")
+            logging.error(f"❌ Failed to sync command tree: {e}")
             
     async def start(self) -> None:
         """Start the bot application."""

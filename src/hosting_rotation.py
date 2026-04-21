@@ -368,6 +368,11 @@ class SecondaryHostCommands(commands.Cog):
             await interaction.response.send_message("❌ An error occurred while moving the game host.")
 
 async def setup(bot):
+    cfg = Config.load()
+    if not cfg.hosting_rotation_channel_id:
+        raise RuntimeError(
+            "HOSTING_ROTATION_CHANNEL_ID is not set; hosting rotation commands cannot be restricted to a channel."
+        )
     await bot.add_cog(HostingRotationCommands(bot))
     await bot.add_cog(SecondaryHostCommands(bot))
     logger.info("✅ Hosting rotation commands loaded")

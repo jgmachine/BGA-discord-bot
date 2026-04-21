@@ -335,5 +335,10 @@ class CountingGame(commands.Cog):
         )
 
 async def setup(bot):
+    cfg = Config.load()
+    if not cfg.counting_channel_id:
+        raise RuntimeError(
+            "COUNTING_CHANNEL_ID is not set; counting game cannot identify its channel."
+        )
     await bot.add_cog(CountingGame(bot))
     logger.info("✅ Counting game cog loaded")
