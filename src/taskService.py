@@ -32,7 +32,10 @@ class BGATaskService:
                 f"New active player in game: {game.id} New player: {activePlayerId} Previous active player: {previousActivePlayerId}"
             )
             self.database.update_active_player(game.id, activePlayerId)
-            await bga_commands.notify_turn(bot, activePlayerId, game.id)  # Updated to use bga_commands
+            await bga_commands.notify_turn(
+                bot, activePlayerId, game.id,
+                self.database, self.config.notify_channel_id,
+            )
 
     @tasks.loop(minutes=1)
     async def process_games(self, bot):

@@ -8,30 +8,27 @@ from src.database import Database
 from . import utils
 from src.config import Config
 
-config = Config.load()
-database = Database(config.database_path)
-NOTIFY_CHANNEL_ID = config.notify_channel_id
 
 class BGACommands(commands.Cog):
     """Commands for managing Board Game Arena integration."""
     
     def __init__(self, bot):
         self.bot = bot
-        self.config = Config.load()  # Load config per instance
-        self.database = Database(self.config.database_path)  # Create database per instance
+        self.config = Config.load()
+        self.database = Database(self.config.database_path)
         self.notify_channel_id = self.config.notify_channel_id
 
     @app_commands.command(name="bga_unlink", description="Unlink your Discord account from BGA")
     async def bga_unlink(self, interaction: discord.Interaction):
-        database.delete_user_data(interaction.user.id)
+        self.database.delete_user_data(interaction.user.id)
         await interaction.response.send_message("BGA account unlinked!")
 
     @app_commands.command(name="bga_untrack", description="Stop tracking a BGA game")
     @app_commands.describe(game_id="The ID of the BGA game to stop tracking")
     async def bga_untrack(self, interaction: discord.Interaction, game_id: str):
         try:
-            game = database.get_game_by_id(game_id)
-            database.delete_game_data(game_id)
+            game = self.database.get_game_by_id(game_id)
+            self.database.delete_game_data(game_id)
             await interaction.response.send_message(f"Stopped tracking {game.name} (ID: {game.id})")
         except Exception as e:
             logging.error(f"Error when removing game: {e}")
@@ -44,12 +41,15 @@ class BGACommands(commands.Cog):
             game_id = utils.extractGameId(url)
             game_name, active_player_id = await webscraper.getGameInfo(url)
 
-            database.insert_game_data(game_id, url, game_name, active_player_id)
+            self.database.insert_game_data(game_id, url, game_name, active_player_id)
 
             await interaction.response.send_message(
                 f"Now tracking BGA game: {game_name} (ID: {game_id})"
             )
-            await notify_turn(self.bot, active_player_id, game_id)
+            await notify_turn(
+                self.bot, active_player_id, game_id,
+                self.database, self.notify_channel_id,
+            )
 
         except Exception as e:
             logging.error(f"Error when tracking BGA game: {e}")
@@ -61,7 +61,6 @@ class BGACommands(commands.Cog):
     @app_commands.describe(bga_id="Your Board Game Arena username")
     async def bga_link(self, interaction: discord.Interaction, bga_id: str):
         try:
-            # Use instance database instead of global
             self.database.insert_user_data(interaction.user.id, bga_id)
             await interaction.response.send_message(f"Successfully linked to BGA account: {bga_id}")
             logging.info(f"User {interaction.user.id} linked to BGA account {bga_id}")
@@ -75,7 +74,7 @@ class BGACommands(commands.Cog):
     @app_commands.command(name="bga_users", description="Show all linked BGA users (debug)")
     async def bga_users(self, interaction: discord.Interaction):
         try:
-            users = database.get_all_bga_ids()
+            users = self.database.get_all_bga_ids()
             if users:
                 await interaction.response.send_message(f"Linked BGA accounts: {users}")
             else:
@@ -88,7 +87,7 @@ class BGACommands(commands.Cog):
     async def bga_games(self, interaction: discord.Interaction):
         """Shows all games currently being tracked"""
         try:
-            games = database.get_all_games()
+            games = self.database.get_all_games()
             if games:
                 embed = discord.Embed(
                     title="🎲 Tracked BGA Games",
@@ -193,7 +192,7 @@ class BGACommands(commands.Cog):
             )
             logging.error(f"Error updating notification preferences: {e}")
 
-async def notify_turn(bot, bga_id, game_id):
+async def notify_turn(bot, bga_id, game_id, database: Database, notify_channel_id: int):
     """Notify a user that it's their turn in a BGA game."""
     logging.info(f"Notifying turn for BGA game {game_id}, player {bga_id}")
 
@@ -207,7 +206,7 @@ async def notify_turn(bot, bga_id, game_id):
 
         game = database.get_game_by_id(game_id)
         prefs = database.get_notification_preferences(discord_id)
-        
+
         if not prefs:
             logging.error(f"No notification preferences found for user {discord_id}")
             return
@@ -215,7 +214,7 @@ async def notify_turn(bot, bga_id, game_id):
         # Send channel notification if enabled
         if prefs['channel_enabled']:
             try:
-                channel = bot.get_channel(NOTIFY_CHANNEL_ID)
+                channel = bot.get_channel(notify_channel_id)
                 mention = f"<@{discord_id}>"
                 await channel.send(
                     f"🎲 It's your turn {mention} in [{game.name}]({game.url})!"
