@@ -30,8 +30,12 @@ class BGACommands(commands.Cog):
             game = self.database.get_game_by_id(game_id)
             self.database.delete_game_data(game_id)
             await interaction.response.send_message(f"Stopped tracking {game.name} (ID: {game.id})")
-        except Exception as e:
-            logging.error(f"Error when removing game: {e}")
+        except (AttributeError, sqlite3.Error) as e:
+            # AttributeError: get_game_by_id returned None (game not found)
+            logging.error(f"Error when removing game {game_id}: {e}")
+            await interaction.response.send_message(f"Could not find BGA game with ID: {game_id}")
+        except Exception:
+            logging.exception(f"Unexpected error when removing game {game_id}")
             await interaction.response.send_message(f"Could not find BGA game with ID: {game_id}")
 
     @app_commands.command(name="bga_track", description="Start tracking a BGA game")
@@ -51,8 +55,15 @@ class BGACommands(commands.Cog):
                 self.database, self.notify_channel_id,
             )
 
-        except Exception as e:
-            logging.error(f"Error when tracking BGA game: {e}")
+        except (TypeError, sqlite3.Error, RuntimeError) as e:
+            # TypeError: getGameInfo returned None and was unpacked into a tuple.
+            # RuntimeError: webscraper could not reach BGA.
+            logging.error(f"Error when tracking BGA game {url}: {e}")
+            await interaction.response.send_message(
+                f"Failed to track BGA game. Please verify the URL is correct: {url}"
+            )
+        except Exception:
+            logging.exception(f"Unexpected error tracking BGA game {url}")
             await interaction.response.send_message(
                 f"Failed to track BGA game. Please verify the URL is correct: {url}"
             )
@@ -67,9 +78,9 @@ class BGACommands(commands.Cog):
         except sqlite3.IntegrityError:
             await interaction.response.send_message("This Discord account or BGA ID is already linked!", ephemeral=True)
             logging.warning(f"Failed to link user {interaction.user.id} - already exists")
-        except Exception as e:
+        except Exception:
             await interaction.response.send_message("An error occurred while linking your account. Please try again.", ephemeral=True)
-            logging.error(f"Error linking BGA account: {e}")
+            logging.exception(f"Error linking BGA account for user {interaction.user.id}")
 
     @app_commands.command(name="bga_users", description="Show all linked BGA users (debug)")
     async def bga_users(self, interaction: discord.Interaction):
@@ -79,9 +90,12 @@ class BGACommands(commands.Cog):
                 await interaction.response.send_message(f"Linked BGA accounts: {users}")
             else:
                 await interaction.response.send_message("No linked BGA accounts found.")
-        except Exception as e:
+        except sqlite3.Error as e:
             await interaction.response.send_message(f"Database error: {e}")
-            logging.error(f"Database error: {e}")
+            logging.error(f"Database error in bga_users: {e}")
+        except Exception:
+            await interaction.response.send_message("An unexpected error occurred.")
+            logging.exception("Unexpected error in bga_users")
 
     @app_commands.command(name="bga_games", description="Show all tracked BGA games")
     async def bga_games(self, interaction: discord.Interaction):
@@ -103,9 +117,12 @@ class BGACommands(commands.Cog):
                 logging.info(f"✅ Displayed {len(games)} tracked games")
             else:
                 await interaction.response.send_message("No games currently being tracked.")
-        except Exception as e:
+        except sqlite3.Error as e:
             await interaction.response.send_message(f"Database error: {e}")
-            logging.error(f"Database error: {e}")
+            logging.error(f"Database error in bga_games: {e}")
+        except Exception:
+            await interaction.response.send_message("An unexpected error occurred.")
+            logging.exception("Unexpected error in bga_games")
 
     @app_commands.command(name="bga_settings", description="Show your current BGA settings")
     async def bga_settings(self, interaction: discord.Interaction):
@@ -145,12 +162,18 @@ class BGACommands(commands.Cog):
             embed.set_footer(text="Use /bga_notifications to update your notification preferences")
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        except Exception as e:
+        except sqlite3.Error as e:
             await interaction.response.send_message(
-                "An error occurred while fetching your settings.", 
+                "A database error occurred while fetching your settings.",
                 ephemeral=True
             )
-            logging.error(f"Error fetching user settings: {e}")
+            logging.error(f"Database error fetching user settings for {interaction.user.id}: {e}")
+        except Exception:
+            await interaction.response.send_message(
+                "An unexpected error occurred while fetching your settings.",
+                ephemeral=True
+            )
+            logging.exception(f"Unexpected error fetching user settings for {interaction.user.id}")
 
     @app_commands.command(name="bga_notifications", description="Set your notification preferences for BGA turns")
     @app_commands.describe(setting="Choose how you want to receive notifications")
@@ -185,12 +208,18 @@ class BGACommands(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             logging.info(f"User {interaction.user.id} updated notification settings to {setting.value}")
 
-        except Exception as e:
+        except sqlite3.Error as e:
             await interaction.response.send_message(
-                "An error occurred while updating your preferences.", 
+                "A database error occurred while updating your preferences.",
                 ephemeral=True
             )
-            logging.error(f"Error updating notification preferences: {e}")
+            logging.error(f"Database error updating notification prefs for {interaction.user.id}: {e}")
+        except Exception:
+            await interaction.response.send_message(
+                "An unexpected error occurred while updating your preferences.",
+                ephemeral=True
+            )
+            logging.exception(f"Unexpected error updating notification prefs for {interaction.user.id}")
 
 async def notify_turn(bot, bga_id, game_id, database: Database, notify_channel_id: int):
     """Notify a user that it's their turn in a BGA game."""
@@ -215,13 +244,18 @@ async def notify_turn(bot, bga_id, game_id, database: Database, notify_channel_i
         if prefs['channel_enabled']:
             try:
                 channel = bot.get_channel(notify_channel_id)
-                mention = f"<@{discord_id}>"
-                await channel.send(
-                    f"🎲 It's your turn {mention} in [{game.name}]({game.url})!"
-                )
-                logging.info("Turn notification sent to channel successfully")
-            except Exception as e:
+                if channel is None:
+                    logging.error(f"Channel {notify_channel_id} not found or bot lacks access")
+                else:
+                    mention = f"<@{discord_id}>"
+                    await channel.send(
+                        f"🎲 It's your turn {mention} in [{game.name}]({game.url})!"
+                    )
+                    logging.info("Turn notification sent to channel successfully")
+            except discord.HTTPException as e:
                 logging.error(f"Failed to send channel notification: {e}")
+            except Exception:
+                logging.exception("Unexpected error sending channel notification")
 
         # Send DM if enabled
         if prefs['dm_enabled']:
@@ -234,8 +268,10 @@ async def notify_turn(bot, bga_id, game_id, database: Database, notify_channel_i
                 logging.info("Turn notification sent via DM successfully")
             except discord.Forbidden:
                 logging.error(f"Could not send DM - user {discord_id} has DMs disabled")
-            except Exception as e:
+            except discord.HTTPException as e:
                 logging.error(f"Failed to send DM notification: {e}")
+            except Exception:
+                logging.exception(f"Unexpected error sending DM to {discord_id}")
 
 async def setup(bot):
     cfg = Config.load()
