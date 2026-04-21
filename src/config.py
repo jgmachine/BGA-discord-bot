@@ -1,7 +1,9 @@
+import logging
+import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass
-import os
+
 from dotenv import load_dotenv
 
 @dataclass
@@ -22,12 +24,12 @@ class Config:
         load_dotenv()
 
         data_dir = Path("/data")
-        
-        # Create data directory if it doesn't exist
         data_dir.mkdir(parents=True, exist_ok=True)
-        # Ensure proper permissions
-        os.system(f"chmod 777 {data_dir}")
-        
+        try:
+            os.chmod(data_dir, 0o755)
+        except PermissionError as e:
+            logging.warning(f"Could not chmod {data_dir}: {e}")
+
         database_path = data_dir / "database.db"
 
         return cls(
