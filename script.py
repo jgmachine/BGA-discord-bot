@@ -57,6 +57,7 @@ class BGABot:
             "src.bga_commands",
             "src.counting.counting_game",
             "src.events",
+            "src.community_cal.cog",
         ]
         loaded = 0
         for ext in extensions:

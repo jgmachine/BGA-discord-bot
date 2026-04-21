@@ -1,0 +1,23 @@
+timezone: America/Los_Angeles
+
+events:
+  - name: Mega Monday
+    venue: Matrix
+    rrule: "FREQ=WEEKLY;BYDAY=MO"
+    start_time: "18:00"
+    end_time: "22:00"
+    color: "#4C6EF5"
+
+  - name: RAGE Meetup
+    venue: Fratelli's Pizza
+    rrule: "FREQ=MONTHLY;BYDAY=3FR"
+    start_time: "18:00"
+    end_time: "21:00"
+    color: "#E8590C"
+
+  - name: Game Night
+    venue: Redding Public Market
+    rrule: "FREQ=MONTHLY;BYDAY=4TU"
+    start_time: "18:00"
+    end_time: "21:00"
+    color: "#2F9E44"
