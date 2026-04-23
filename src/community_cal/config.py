@@ -12,6 +12,7 @@ import yaml
 class EventDef:
     name: str
     venue: str
+    short_label: str
     rrule: str
     start_time: str
     end_time: str
@@ -33,6 +34,7 @@ def load_config(path: Path) -> CalendarConfig:
         EventDef(
             name=e["name"],
             venue=e["venue"],
+            short_label=e["short_label"],
             rrule=e["rrule"],
             start_time=e["start_time"],
             end_time=e["end_time"],

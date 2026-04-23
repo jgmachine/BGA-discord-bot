@@ -139,7 +139,7 @@ def render_month(
                 if pill_y1 > y1 - 6:
                     break
                 draw.rectangle([pill_x0, pill_y0, pill_x1, pill_y1], fill=color)
-                label = f"{occ.start.strftime('%-I%p').lower()} {occ.event.name}"
+                label = f"{occ.start.strftime('%-I%p').lower()} {occ.event.short_label}"
                 max_w = pill_x1 - pill_x0 - 12
                 while draw.textlength(label, font=event_font) > max_w and len(label) > 3:
                     label = label[:-2] + "…"
