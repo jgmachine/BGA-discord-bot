@@ -1,4 +1,6 @@
 import logging
+import sqlite3
+
 from .base import BaseDatabase
 
 # Configure hosting rotation logger
@@ -123,8 +125,11 @@ class HostingDatabase(BaseDatabase):
             host_logger.info(f"Host added to {'venue' if host_type_id == 1 else 'game'} rotation")
             return True
             
-        except Exception as e:
-            host_logger.error(f"Error adding host: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error adding host {discord_id}: {e}")
+            raise
+        except Exception:
+            host_logger.exception(f"Unexpected error adding host {discord_id}")
             raise
 
     def get_next_host(self, host_type_id=1):
@@ -144,8 +149,11 @@ class HostingDatabase(BaseDatabase):
                 return {"discord_id": results[0][0], "username": results[0][1]}
             return None
             
-        except Exception as e:
-            host_logger.error(f"Error getting next host: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error getting next host: {e}")
+            raise
+        except Exception:
+            host_logger.exception("Unexpected error getting next host")
             raise
 
     def rotate_hosts(self, host_type_id=1):
@@ -195,8 +203,11 @@ class HostingDatabase(BaseDatabase):
             host_logger.info(f"Host {host_name} rotated to the end of the queue")
             return f"Rotated: {host_name} moved to the end of the queue"
             
-        except Exception as e:
-            host_logger.error(f"Error rotating hosts: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error rotating hosts: {e}")
+            raise
+        except Exception:
+            host_logger.exception("Unexpected error rotating hosts")
             raise
 
     def defer_host(self, discord_id, host_type_id=1):
@@ -225,8 +236,11 @@ class HostingDatabase(BaseDatabase):
             
             host_logger.info(f"Host {username} deferred successfully (keeping position {position})")
             return f"Deferred: {username} has deferred their turn"
-        except Exception as e:
-            host_logger.error(f"Error deferring host: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error deferring host {discord_id}: {e}")
+            raise
+        except Exception:
+            host_logger.exception(f"Unexpected error deferring host {discord_id}")
             raise
 
     def snooze_host(self, discord_id, host_type_id=1):
@@ -259,8 +273,11 @@ class HostingDatabase(BaseDatabase):
             
             host_logger.info(f"Host {username} snoozed successfully")
             return f"Snoozed: {username} removed from the active rotation"
-        except Exception as e:
-            host_logger.error(f"Error snoozing host: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error snoozing host {discord_id}: {e}")
+            raise
+        except Exception:
+            host_logger.exception(f"Unexpected error snoozing host {discord_id}")
             raise
 
     def activate_host(self, discord_id, host_type_id=1):
@@ -290,8 +307,11 @@ class HostingDatabase(BaseDatabase):
             
             host_logger.info(f"Host {host[0]} activated and placed at position {next_position}")
             return f"Activated: {host[0]} added back to rotation at position {next_position}"
-        except Exception as e:
-            host_logger.error(f"Error activating host: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error activating host {discord_id}: {e}")
+            raise
+        except Exception:
+            host_logger.exception(f"Unexpected error activating host {discord_id}")
             raise
     
     def get_all_hosts(self, host_type_id=1):
@@ -314,8 +334,11 @@ class HostingDatabase(BaseDatabase):
             else:
                 host_logger.warning("No active hosts found in rotation")
                 return []
-        except Exception as e:
-            host_logger.error(f"Error fetching all hosts: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error fetching all hosts: {e}")
+            raise
+        except Exception:
+            host_logger.exception("Unexpected error fetching all hosts")
             raise
 
     def _resequence_positions(self, host_type_id=1):
@@ -337,8 +360,11 @@ class HostingDatabase(BaseDatabase):
                 )
             
             host_logger.info(f"Resequenced positions for {len(results)} active hosts")
-        except Exception as e:
-            host_logger.error(f"Error resequencing positions: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error resequencing positions: {e}")
+            raise
+        except Exception:
+            host_logger.exception("Unexpected error resequencing positions")
             raise
 
     def move_host(self, discord_id, position_type, host_type_id=1):
@@ -404,8 +430,11 @@ class HostingDatabase(BaseDatabase):
             self._resequence_positions(host_type_id)
             return msg
             
-        except Exception as e:
-            host_logger.error(f"Error moving host: {e}")
+        except sqlite3.Error as e:
+            host_logger.error(f"Database error moving host {discord_id}: {e}")
+            raise
+        except Exception:
+            host_logger.exception(f"Unexpected error moving host {discord_id}")
             raise
 
     def debug_schema(self):
@@ -414,5 +443,5 @@ class HostingDatabase(BaseDatabase):
             results = self._execute("PRAGMA table_info(hosting_rotation)")
             columns = [(row[1], row[2]) for row in results]
             host_logger.info(f"Current hosting_rotation schema: {columns}")
-        except Exception as e:
-            host_logger.error(f"Error getting schema: {e}")
+        except Exception:
+            host_logger.exception("Error getting schema")

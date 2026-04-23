@@ -1,17 +1,14 @@
-import os
+import logging
+import sqlite3
+
 import discord
 from discord import app_commands
 from discord.ext import commands
-import logging
+
 from src.database import Database
 from src.config import Config
 
 logger = logging.getLogger(__name__)
-config = Config.load()
-
-# Use config values
-HOSTING_ROTATION_CHANNEL_ID = config.hosting_rotation_channel_id
-database = Database(config.database_path)
 
 def host_command():
     """Combined decorator for host commands."""
@@ -38,7 +35,7 @@ class HostingRotationCommands(commands.Cog):
         """Adds a user to the host list"""
         logger.info(f"🔄 Received command: /host_add {member.name} (ID: {member.id})")
 
-        database.add_host(str(member.id), member.name)
+        self.database.add_host(str(member.id), member.name)
         await interaction.response.send_message(
             f"✅ {member.name} has been added to the host list!"
         )
@@ -51,31 +48,35 @@ class HostingRotationCommands(commands.Cog):
         logger.info(f"🔄 Received command: /host_remove {member.name}")
 
         try:
-            database.connect()
-            cursor = database.cursor
-            
+            self.database.connect()
+            cursor = self.database.cursor
+
             cursor.execute("DELETE FROM hosting_rotation WHERE discord_id=?", (str(member.id),))
             if cursor.rowcount == 0:
                 await interaction.response.send_message(f"❌ {member.name} is not in the host list.")
                 return
-                
-            database.conn.commit()
+
+            self.database.conn.commit()
             await interaction.response.send_message(f"✅ {member.name} has been removed from the host list.")
             logger.info(f"✅ Removed {member.name} from the host list")
-            
-        except Exception as e:
-            logger.error(f"Error removing host: {e}")
-            database.conn.rollback()
-            await interaction.response.send_message("❌ An error occurred while processing this command.")
+
+        except sqlite3.Error as e:
+            logger.error(f"Database error removing host {member.id}: {e}")
+            self.database.conn.rollback()
+            await interaction.response.send_message("❌ A database error occurred while processing this command.")
+        except Exception:
+            logger.exception(f"Unexpected error removing host {member.id}")
+            self.database.conn.rollback()
+            await interaction.response.send_message("❌ An unexpected error occurred while processing this command.")
         finally:
-            database.close()
+            self.database.close()
 
     @host_command()
     async def host_next(self, interaction: discord.Interaction):
         """Shows who's next in the list"""
         logger.info("🔄 Received command: /host_next")
 
-        host = database.get_next_host()
+        host = self.database.get_next_host()
         if host:
             await interaction.response.send_message(
                 f"🎲 The next host is: **{host['username']}**"
@@ -103,9 +104,12 @@ class HostingRotationCommands(commands.Cog):
             result = self.database.move_host(str(member.id), position.value, host_type_id=1)
             await interaction.response.send_message(f"✅ {result}")
             logger.info(f"✅ Successfully moved {member.name} to {position.value}")
-        except Exception as e:
-            logger.error(f"Error moving host: {e}")
-            await interaction.response.send_message("❌ An error occurred while processing this command.")
+        except sqlite3.Error as e:
+            logger.error(f"Database error moving host {member.id}: {e}")
+            await interaction.response.send_message("❌ A database error occurred while processing this command.")
+        except Exception:
+            logger.exception(f"Unexpected error moving host {member.id}")
+            await interaction.response.send_message("❌ An unexpected error occurred while processing this command.")
 
     @host_command()
     @app_commands.describe(first="First host", second="Second host")
@@ -114,57 +118,62 @@ class HostingRotationCommands(commands.Cog):
         logger.info(f"🔄 Received command: /host_swap {first.name} {second.name}")
         
         try:
-            database.connect()
-            cursor = database.cursor
-            
-            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
+            self.database.connect()
+            cursor = self.database.cursor
+
+            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1",
                            (str(first.id),))
             host1 = cursor.fetchone()
-            
-            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1", 
+
+            cursor.execute("SELECT username, order_position FROM hosting_rotation WHERE discord_id=? AND active=1",
                            (str(second.id),))
             host2 = cursor.fetchone()
-            
+
             if not host1 or not host2:
                 missing = []
                 if not host1:
                     missing.append(first.name)
                 if not host2:
                     missing.append(second.name)
-                    
+
                 await interaction.response.send_message(f"❌ {', '.join(missing)} not found in active rotation.")
                 logger.warning(f"Hosts not found or not active for swap command: {', '.join(missing)}")
-                database.close()
+                self.database.close()
                 return
-                
+
             username1, position1 = host1
             username2, position2 = host2
-            
+
             logger.info(f"Swapping {username1} (position {position1}) with {username2} (position {position2})")
-            
-            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+
+            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?",
                          (position2, str(first.id)))
-            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?", 
+            cursor.execute("UPDATE hosting_rotation SET order_position = ? WHERE discord_id = ?",
                          (position1, str(second.id)))
-            
-            database.conn.commit()
-            database.close()
-            
+
+            self.database.conn.commit()
+            self.database.close()
+
             await interaction.response.send_message(f"✅ Swapped positions of {username1} and {username2}!")
             logger.info(f"✅ Swapped positions of {username1} and {username2}")
-            
-        except Exception as e:
-            logger.error(f"Error in swap_position command: {e}")
-            database.conn.rollback()
-            database.close()
-            await interaction.response.send_message("❌ An error occurred while processing this command.")
+
+        except sqlite3.Error as e:
+            logger.error(f"Database error in swap_position command: {e}")
+            self.database.conn.rollback()
+            self.database.close()
+            await interaction.response.send_message("❌ A database error occurred while processing this command.")
+        except Exception:
+            logger.exception("Unexpected error in swap_position command")
+            self.database.conn.rollback()
+            self.database.close()
+            await interaction.response.send_message("❌ An unexpected error occurred while processing this command.")
 
     @host_command()
     async def host_rotate(self, interaction: discord.Interaction):
         """Moves the current host to the bottom of the list"""
         logger.info("🔄 Received command: /host_rotate")
 
-        result = database.rotate_hosts()
+        result = self.database.rotate_hosts()
         await interaction.response.send_message("✅ Hosting rotation updated!")
         logger.info(f"✅ Hosting rotation has been updated. {result}")
 
@@ -288,10 +297,15 @@ class SecondaryHostCommands(commands.Cog):
                 await interaction.response.send_message(
                     f"❌ Failed to add {member.name} to the game host list."
                 )
-        except Exception as e:
-            logger.error(f"Error adding game host: {e}")
+        except sqlite3.Error as e:
+            logger.error(f"Database error adding game host {member.id}: {e}")
             await interaction.response.send_message(
-                "❌ An error occurred while adding the game host. Check the logs for details."
+                "❌ A database error occurred while adding the game host. Check the logs for details."
+            )
+        except Exception:
+            logger.exception(f"Unexpected error adding game host {member.id}")
+            await interaction.response.send_message(
+                "❌ An unexpected error occurred while adding the game host. Check the logs for details."
             )
 
     @host_command()
@@ -308,9 +322,12 @@ class SecondaryHostCommands(commands.Cog):
                 await interaction.response.send_message(f"❌ {member.name} is not in the game host list.")
                 return
             await interaction.response.send_message(f"✅ {member.name} has been removed from the game host list.")
-        except Exception as e:
-            logger.error(f"Error removing game host: {e}")
-            await interaction.response.send_message("❌ An error occurred while processing this command.")
+        except sqlite3.Error as e:
+            logger.error(f"Database error removing game host {member.id}: {e}")
+            await interaction.response.send_message("❌ A database error occurred while processing this command.")
+        except Exception:
+            logger.exception(f"Unexpected error removing game host {member.id}")
+            await interaction.response.send_message("❌ An unexpected error occurred while processing this command.")
 
     @host_command()
     async def host2_next(self, interaction: discord.Interaction):
@@ -363,11 +380,19 @@ class SecondaryHostCommands(commands.Cog):
             result = self.database.move_host(str(member.id), position.value, host_type_id=2)
             await interaction.response.send_message(f"✅ {result}")
             logger.info(f"✅ Successfully moved {member.name} to {position.value}")
-        except Exception as e:
-            logger.error(f"Error moving game host: {e}")
-            await interaction.response.send_message("❌ An error occurred while moving the game host.")
+        except sqlite3.Error as e:
+            logger.error(f"Database error moving game host {member.id}: {e}")
+            await interaction.response.send_message("❌ A database error occurred while moving the game host.")
+        except Exception:
+            logger.exception(f"Unexpected error moving game host {member.id}")
+            await interaction.response.send_message("❌ An unexpected error occurred while moving the game host.")
 
 async def setup(bot):
+    cfg = Config.load()
+    if not cfg.hosting_rotation_channel_id:
+        raise RuntimeError(
+            "HOSTING_ROTATION_CHANNEL_ID is not set; hosting rotation commands cannot be restricted to a channel."
+        )
     await bot.add_cog(HostingRotationCommands(bot))
     await bot.add_cog(SecondaryHostCommands(bot))
     logger.info("✅ Hosting rotation commands loaded")

@@ -1,7 +1,9 @@
+import logging
+import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass
-import os
+
 from dotenv import load_dotenv
 
 @dataclass
@@ -22,16 +24,22 @@ class Config:
         load_dotenv()
 
         data_dir = Path("/data")
-        
-        # Create data directory if it doesn't exist
         data_dir.mkdir(parents=True, exist_ok=True)
-        # Ensure proper permissions
-        os.system(f"chmod 777 {data_dir}")
-        
+        try:
+            os.chmod(data_dir, 0o755)
+        except PermissionError as e:
+            logging.warning(f"Could not chmod {data_dir}: {e}")
+
         database_path = data_dir / "database.db"
 
+        discord_token = os.getenv("DISCORD_TOKEN", "")
+        if not discord_token:
+            raise ValueError(
+                "DISCORD_TOKEN is not set. The bot cannot start without it."
+            )
+
         return cls(
-            discord_token=os.getenv("DISCORD_TOKEN", ""),
+            discord_token=discord_token,
             discord_app_id=os.getenv("DISCORD_APP_ID"),
             notify_channel_id=int(os.getenv("NOTIFY_CHANNEL_ID", "0")),
             hosting_rotation_channel_id=int(os.getenv("HOSTING_ROTATION_CHANNEL_ID", "0")),
